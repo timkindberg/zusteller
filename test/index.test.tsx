@@ -222,5 +222,97 @@ describe('create', () => {
     expect(screen.getByRole('heading').textContent).toEqual(
       'Welcome to the future, React Devs'
     );
+  })
+
+  test('composition 2', async () => {
+    const useMsg = () => {
+      return useState('Welcome');
+    };
+    const useName = () => {
+      return useState('Tim');
+    };
+
+    type useWelcomeMsgState = { welcomeMsg: string, msg: string, name: string, setMsg: Function, setName: Function}
+    const useWelcomeMsg = create<useWelcomeMsgState>(() => {
+      const [msg, setMsg] = useMsg();
+      const [name, setName] = useName();
+      return { welcomeMsg: `${msg}, ${name}`, msg, setMsg, name, setName };
+    });
+
+    const Title = () => {
+      const welcomeMsg = useWelcomeMsg(s => s.welcomeMsg);
+      return <h1>{welcomeMsg}</h1>;
+    };
+
+    const Article = () => {
+      const welcomeMsg = useWelcomeMsg(s => s.welcomeMsg);
+      return <article>{welcomeMsg}</article>;
+    };
+
+    const Edit = () => {
+      const {msg, setMsg, name, setName} = useWelcomeMsg(({ welcomeMsg, ...rest }) => rest);
+      return (
+        <>
+          <input
+            aria-label="Msg"
+            value={msg}
+            onChange={e => setMsg(e.target.value)}
+          />
+          <input
+            aria-label="Name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
+        </>
+      );
+    };
+
+    const TestBed = () => {
+      return (
+        <>
+          <Title />
+          <Article />
+          <Edit />
+        </>
+      );
+    };
+
+    render(<TestBed />);
+
+    expect(screen.getByRole('heading').textContent).toEqual('Welcome, Tim');
+    expect(screen.getByRole('article').textContent).toEqual('Welcome, Tim');
+
+    const msgInput: HTMLInputElement = screen.getByRole('textbox', {
+      name: 'Msg',
+    }) as HTMLInputElement;
+    const nameInput: HTMLInputElement = screen.getByRole('textbox', {
+      name: 'Name',
+    }) as HTMLInputElement;
+
+    expect(msgInput.value).toEqual('Welcome');
+    expect(nameInput.value).toEqual('Tim');
+
+    userEvent.type(msgInput, '{selectall}Good Riddance');
+    userEvent.type(
+      nameInput,
+      '{selectall}proprietary state objects and React Providers!'
+    );
+
+    expect(screen.getByRole('heading').textContent).toEqual(
+      'Good Riddance, proprietary state objects and React Providers!'
+    );
+    expect(screen.getByRole('article').textContent).toEqual(
+      'Good Riddance, proprietary state objects and React Providers!'
+    );
+
+    act(() => {
+      const {setMsg, setName} = useWelcomeMsg.getState();
+      setMsg('Welcome to the future');
+      setName('React Devs');
+    });
+
+    expect(screen.getByRole('heading').textContent).toEqual(
+      'Welcome to the future, React Devs'
+    );
   });
 });
