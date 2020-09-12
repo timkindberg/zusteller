@@ -20,7 +20,7 @@ Zustand was one of the first libraries to figure out how to elegantly share stat
 selectors, a required feature when it's time to optimize performance. Zustand was my go-to state solution and I consider
 it to be a great accomplishment. **But it uses a custom API and I really like hooks.**
 
-##### What if Zustand could work with regular hooks?
+#### So... what if Zustand could work with regular hooks?
 
 ----
 
