@@ -26,68 +26,120 @@ it to be a great accomplishment. **But it uses a custom API and I really like ho
 
 ## "Just hooks" + Zustand
 
-It might look something like this. You can pass any hook. In it's simplest form just pass the `useState` hook.
-Any additional args are passed straight to the hook.
+### Pass create a hook
+
+It might look something like this. First import `create` from `zusteller`.
 
 ```js
-import create from 'zusteller' 
-
-// Just like zustand, we create a store, but pass it your hook and any hook args.
-const useTitle = create(useState, 'Welcome');
-
-const Title = () => {
-  // Use regular zustand selectors
-  const title = useTitle(s => s[0]);
-  return <h1>{title}</h1>;
-};
-
-const TitleInput = () => {
-  // If you don't use a selector you get the whole state
-  const [title, setTitle] = useTitle();
-  return <input value={title} onChange={e => setTitle(e.target.value)} />;
-};
-
-const App = () => {
-  return (
-    <>
-      <Title />
-      <TitleInput />
-    </>
-  );
-};
+import create from 'zusteller'
 ```
 
-Or for more complex needs, here we:
-- Creating two zusteller hooks from `useState` hooks
-- Creating a new hook that composes those hooks
+Pass `create` a hook. Here we pass the `useState` hook provided by React.
 
 ```js
-import create from 'zusteller' 
-
-// Notice we pass inline anonymous hooks to these two create calls.
-const useMsg = create(useState, 'Welcome');
-const useName = create(useState, 'Tim');
-
-const useWelcomeMsg = () => {
-  const msg = useMsg(s => s[0]);
-  const name = useName(s => s[0]);
-  return `${msg}, ${name}`;
-};
-
-// Now use the useWelcomeMsg hook anywhere
+const useStore = create(useState)
 ```
 
-You have the freedom to build your hooks however you want. Use as many or as little zusteller hooks as you need.
+Pass your own custom hook.
 
-## Notes:
+```js
+const useStore = create(useMyOwnHook)
+```
 
-The hook returned from `create` is a small wrapper around a regular zustand hook. We use zustand under the hood.
+### Hook args
 
-The differences:
-- Zustand only allows state to be an `object`, but Zusteller allows `literals, objects, arrays, and undefined/null`.
-- Zustand has a `setState` method on the hook, but Zusteller does not. If you want to alter state you need to expose a
-  method in your hook and use it, e.g. `useSomeZustellerState.getState().setSomething()`
+If the hook takes args, provide them as additional args to `create`.
+
+
+```js
+const useStore = create(useState, initialState)
+const useStore = create(useMyOwnHook, initialA, initialB, initialC, ...etc)
+```
+
+### Inline anonymous hook
+
+Or write an inline anonymous hook (and skip passing hook args).
+
+```js
+const useStore = create(() => {
+  return useStore('Hello')
+})
+
+const useStore = create() => {
+  const [foo, setFoo] = useState()
+  const [bar, setBar] = useState()
+  ... do some logic
+  return ... some things ...
+})
+```
+
+### The returned zustand hook
+
+The hook you are returned is a small wrapper around a regular zustand hook object. Zusteller is built on zustand!
+The difference is instead of creating a store with zustands `(set, get) => ({})` creator function, you've essentially
+*lifted* a regular hook to become global. You can now share that lifted hook's state anywhere.
+
+Use it in multiple React components. The state will be shared.
+
+```js
+const useStore = create(useState)
+
+const ComponentA = () => {
+  const [foo, setFoo] = useStore()
+}
+const ComponentB = () => {
+  const [foo, setFoo] = useStore()
+}
+```
+
+Use zustand's selector functionality normally, [reference their docs](https://github.com/react-spring/zustand#selecting-multiple-state-slices) for more info.
+
+```js
+const useStore = create(useState)
+
+// ComponentA only rerenders if `foo` changes
+const ComponentA = () => {
+  const foo = useStore(s => s[0])
+}
+
+// ComponentA only rerenders if `setFoo` changes
+const ComponentB = () => {
+  const setFoo = useStore(s => s[1])
+}
+```
+
+Use it outside of React, using the `getState` prototype method.
+
+> Zustand has a `setState` method on the hook, but Zusteller does not. If you want to alter state you need to expose a
+method in your hook and use it, e.g. `useSomeZustellerState.getState().setSomething()`
+
+```js
+const useStore = create(useState)
+
+const unsub = useStore.subscribe(console.log, s => s[0]) // Log anytime foo changes
+
+const [foo, setFoo] = useStore.getState()
+document.getElementById('button').on('click', () => setFoo('bar'))
+
+unsub()
+```
+
+While zustand can only store `object` state, zusteller allows `literals, objects, arrays, and undefined/null`.
+
+```js
+const useStore = create(() => {
+  if (false) return { foo: true }
+  return 'a regular string'
+})
+
+// Just be sure to protect your selectors if the return type can be variable
+const Component = () => {
+  const msg = useStore(s => s?.foo)
+}
+```
   
+### How does zusteller do it?
+
 To enable the use of hooks we render a React element into an HTMLElement in memory and it runs the hook. When the hook
 result changes, we update the zustand store. 
 
