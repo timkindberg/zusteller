@@ -22,7 +22,7 @@ lack one main thing. **They are not "just hooks".**
 A library that only _exposes_ a hook is nice, but if it cannot _nest_ hooks within, if it can't compose hooks in both
 directions, then it is what I'm calling a "Terminal Hook". **It's the end of the line.**
 
-Being a "Terminal Hook" brings challenges. How do compose or merge various global states together? Redux has 
+Being a "Terminal Hook" brings challenges. How do you compose or merge various global states together? Redux has 
 `combineReducers`. Recoil has `Selectors`. **Hooks compose naturally.**
 
 Zustand was one of the first libraries to figure out how to elegantly share state without Context. It also has
@@ -31,13 +31,15 @@ it to be a great accomplishment. **But it uses a custom API and I really like ho
 
 #### So... what if Zustand could work with regular hooks?
 
+It might look something like this. 
+
 ----
 
 ## "Just hooks" + Zustand
 
 ### Pass create a hook
 
-It might look something like this. First import `create` from `zusteller`.
+First import `create` from `zusteller`.
 
 ```js
 import create from 'zusteller'
@@ -85,7 +87,7 @@ const useStore = create() => {
 ### The returned zustand hook
 
 The hook you are returned is a small wrapper around a regular zustand hook object. Zusteller is built on zustand!
-The difference is instead of creating a store with zustands `(set, get) => ({})` creator function, you've essentially
+The difference is instead of creating a store with zustand's `(set, get) => ({})` creator function, you've essentially
 *lifted* a regular hook to become global. You can now share that lifted hook's state anywhere.
 
 Use it in multiple React components. The state will be shared.
@@ -119,8 +121,7 @@ const ComponentB = () => {
 
 Use it outside of React, using the `getState` prototype method.
 
-> Zustand has a `setState` method on the hook, but Zusteller does not. If you want to alter state you need to expose a
-method in your hook and use it, e.g. `useSomeZustellerState.getState().setSomething()`
+> zustand has a `setState` method on the hook, but zusteller does not.
 
 ```js
 const useStore = create(useState)
@@ -180,7 +181,7 @@ function Controls() {
 
 ### Async actions
 
-The example from Zustand's page. I'd just use react-query for this but it's a simple example.
+The example from zustand's page. I'd just use react-query for this but let's recreate it anyway.
 
 ```js
 import create from 'zusteller'
@@ -194,7 +195,7 @@ const useStore = create(() => {
 })
 ```
 
-But now we can use react-query and zustand together seamlessly.
+Oh wait, but now we can compose other hooks! So we *can* use react-query. Would you look at that?
 
 ```js
 import create from 'zusteller'
@@ -213,7 +214,9 @@ const useStore = create(() => {
 
 ### Reading/writing state and reacting to changes outside of components
 
-Works just like zustand except there is no `setState` prototype method. You must use methods exposed by
+Works just like zustand.
+
+> Except there is no `setState` prototype method. You must use methods exposed by
 your hook to modify the internal hook's state.
 
 ```js
@@ -315,21 +318,22 @@ You could then place this element anywhere as your Context.Consumer location.
 const SomeContext = React.createContext()
 
 // This is not yet possible, just showing an idea
-// Maybe we have an additional `create.withConsumer`
-const useStore = create.withConsumer(() => {
+// Maybe we have an additional `create.withManualInsert`
+// Idk what name to give it...
+const useStore = create.withManualInsert(() => {
   return useContext(SomeContext)
 })
 
 const App = () => {
   return (
     <SomeContext.Provider>
-      <useStore.Consumer /> // Now useStore will pick up the context properly
+      <useStore.Store /> // Now useStore will pick up the context properly
     </SomeContext.Provider>
   )
 }
 ```
 
-Maybe we also have a way to return a full context.
+Maybe we also have a way to return a full context. For a `constate` flavor.
 
 ```js
 // This is not yet possible, just showing an idea
@@ -340,9 +344,9 @@ const useStore = create.withContext(MyContext => () => {
 
 const App = () => {
   return (
-    // Now useStore has both a Provider AND a Consumer :shrug??
+    // Now useStore has both a Provider AND a Store insertion point :shrug??
     <useStore.Provider>
-      <useStore.Consumer />
+      <useStore.Store />
     </useStore.Provider>
   )
 }
