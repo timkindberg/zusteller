@@ -2,9 +2,19 @@
 
 Your global state savior. "Just hooks" + [zustand](https://github.com/react-spring/zustand).
 
+## Disclaimer 
+
+Zusteller is brand new and under development. However, it's a tiny library without much to it.
+
+To enable the use of hooks within zustand **we render a React element into an HTMLElement in memory and it runs the hook.** 
+When the hook result changes, we update the zustand store. 
+
+We need more validation that this approach doesn't introduce
+any unexpected bugs.
+
 ## Motivation:
 
-It is rare that I need global state. Really rare. You can fill 99% of your needs with regular React Hooks and a fetch caching library
+**It is rare that I need global state. Really rare.** You can fill 99% of your needs with regular React Hooks and a fetch caching library
 (e.g. [react-query](https://react-query.tanstack.com/docs/overview) or [swr](https://github.com/vercel/swr)).
 
 However, when you need to use global state you have to learn a new API. Redux, Zustand, Recoil...the APIs are nice but they
@@ -137,13 +147,6 @@ const Component = () => {
   const msg = useStore(s => s?.foo)
 }
 ```
-  
-### How does zusteller do it?
-
-To enable the use of hooks we render a React element into an HTMLElement in memory and it runs the hook. When the hook
-result changes, we update the zustand store. 
-
-We also do some smoothing over to allow any value, not just objects.
 
 ## Additional Examples
 
@@ -287,4 +290,62 @@ function Component() {
   const [state, dispatch] = useStore()
   dispatch({ type: types.increase, by: 2 })
 }
+```
+  
+### What about `React.Context`?
+
+Ok you got me! You found the missing feature :(
+
+This wouldn't work.
+
+```js
+// Remember, this hook is being run in an isolated React element in memory!
+// It will not pick up this context value, because it's not in your app's
+// React tree.
+const useSomeContextVal = () => {
+  return useContext(SomeContext)
+}
+
+const useStore = create(useSomeContextVal)
+```
+
+One way we could fix this in the future is by returning a React element from `create`.
+You could then place this element anywhere as your Context.Consumer location.
+
+```js
+const SomeContext = React.createContext()
+
+// This is not yet possible, just showing an idea
+// Maybe we have an additional `create.withConsumer`
+const useStore = create.withConsumer(() => {
+  return useContext(SomeContext)
+})
+
+const App = () => {
+  return (
+    <SomeContext.Provider>
+      <useStore.Consumer /> // Now useStore will pick up the context properly
+    </SomeContext.Provider>
+  )
+}
+```
+
+Maybe we also have a way to return a full context.
+
+```js
+// This is not yet possible, just showing an idea
+// Maybe we have an additional `create.withContext`
+const useStore = create.withContext(MyContext => () => {
+  return useContext(MyContext)
+})
+
+const App = () => {
+  return (
+    // Now useStore has both a Provider AND a Consumer :shrug??
+    <useStore.Provider>
+      <useStore.Consumer />
+    </useStore.Provider>
+  )
+}
+
 ```
