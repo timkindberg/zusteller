@@ -9,8 +9,7 @@ Zusteller is brand new and under development. However, it's a tiny library witho
 To enable the use of hooks within zustand **we render a React element into an HTMLElement in memory and it runs the hook.** 
 When the hook result changes, we update the zustand store. 
 
-We need more validation that this approach doesn't introduce
-any unexpected bugs.
+We need more validation that this approach doesn't introduce any unexpected or dangerous bugs.
 
 ## Motivation:
 
@@ -26,8 +25,8 @@ directions, then it is what I'm calling a "Terminal Hook". **It's the end of the
 Being a "Terminal Hook" brings challenges. How do compose or merge various global states together? Redux has 
 `combineReducers`. Recoil has `Selectors`. **Hooks compose naturally.**
 
-Zustand was one of the first libraries to figure out how to elegantly share state without Context. It also has has
-selectors, a required feature when it's time to optimize performance. Zustand was my go-to state solution and I consider
+Zustand was one of the first libraries to figure out how to elegantly share state without Context. It also has
+selectors, a required feature when it's time to optimize performance. Zustand is my go-to global state solution and I consider
 it to be a great accomplishment. **But it uses a custom API and I really like hooks.**
 
 #### So... what if Zustand could work with regular hooks?
