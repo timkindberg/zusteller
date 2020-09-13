@@ -176,7 +176,7 @@ function Controls() {
 }
 ```
 
-#### Async actions
+### Async actions
 
 The example from Zustand's page. I'd just use react-query for this but it's a simple example.
 
@@ -209,7 +209,7 @@ const useStore = create(() => {
 
 ```
 
-## Reading/writing state and reacting to changes outside of components
+### Reading/writing state and reacting to changes outside of components
 
 Works just like zustand except there is no `setState` prototype method. You must use methods exposed by
 your hook to modify the internal hook's state.
@@ -236,11 +236,11 @@ unsub3()
 useStore.destroy()
 ```
 
-## Using zusteller without React
+### Using zusteller without React
 
 Not possible. Use zustand. Zusteller uses hooks, and hooks must be run using react and react-dom.
 
-## Want to use immer? 
+### Want to use immer? 
 
 Use a 3rd party immer hook or write your own
 
@@ -264,7 +264,7 @@ function Component() {
 }
 ```
 
-## Can't live without redux-like reducers and action types?
+### Can't live without redux-like reducers and action types?
 
 No judgement I guess. Here's how you do it, you just use `useReducer`. Simple.
 
