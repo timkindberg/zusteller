@@ -33,7 +33,11 @@ export default function create<TState>(
   const useZStore: UseStore<StateInValue<TState>> = zcreate(() => ({}));
   const reactRoot = document.createElement('div');
   ReactDOM.render(
-    <StoreComponent<TState> hook={hook} hookArgs={hookArgs} useZStore={useZStore} />,
+    <StoreComponent<TState>
+      hook={hook}
+      hookArgs={hookArgs}
+      useZStore={useZStore}
+    />,
     reactRoot
   );
   function internalSelector<U>(selector?: StateSelector<TState, U>) {

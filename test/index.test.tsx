@@ -222,7 +222,7 @@ describe('create', () => {
     expect(screen.getByRole('heading').textContent).toEqual(
       'Welcome to the future, React Devs'
     );
-  })
+  });
 
   test('composition 2', async () => {
     const useMsg = () => {
@@ -232,7 +232,13 @@ describe('create', () => {
       return useState('Tim');
     };
 
-    type useWelcomeMsgState = { welcomeMsg: string, msg: string, name: string, setMsg: Function, setName: Function}
+    type useWelcomeMsgState = {
+      welcomeMsg: string;
+      msg: string;
+      name: string;
+      setMsg: Function;
+      setName: Function;
+    };
     const useWelcomeMsg = create<useWelcomeMsgState>(() => {
       const [msg, setMsg] = useMsg();
       const [name, setName] = useName();
@@ -250,7 +256,9 @@ describe('create', () => {
     };
 
     const Edit = () => {
-      const {msg, setMsg, name, setName} = useWelcomeMsg(({ welcomeMsg, ...rest }) => rest);
+      const { msg, setMsg, name, setName } = useWelcomeMsg(
+        ({ welcomeMsg, ...rest }) => rest
+      );
       return (
         <>
           <input
@@ -306,7 +314,7 @@ describe('create', () => {
     );
 
     act(() => {
-      const {setMsg, setName} = useWelcomeMsg.getState();
+      const { setMsg, setName } = useWelcomeMsg.getState();
       setMsg('Welcome to the future');
       setName('React Devs');
     });
