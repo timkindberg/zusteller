@@ -148,7 +148,7 @@ const Component = () => {
 }
 ```
 
-## Additional Examples
+## Let's Recreate Zustand's Doc Examples
 
 > Let's recreate the first example from zustand's page using zusteller
 
@@ -291,6 +291,88 @@ const useStore = create(useReducer, reducer, {grumpiness: 0})
 function Component() {
   const [state, dispatch] = useStore()
   dispatch({ type: types.increase, by: 2 })
+}
+```
+
+## Let's Recreate Constate's Doc Examples
+
+```jsx
+import React, { useState } from "react";
+import create from "zusteller";
+
+// 1️⃣ Create a custom hook as usual
+function useCounter() {
+  const [count, setCount] = useState(0);
+  const increment = () => setCount(prevCount => prevCount + 1);
+  return { count, increment };
+}
+
+// 2️⃣ Wrap your hook with the create function
+const useCounterStore = create(useCounter);
+
+function Button() {
+  // 3️⃣ Use context instead of custom hook
+  const { increment } = useCounterStore();
+  return <button onClick={increment}>+</button>;
+}
+
+function Count() {
+  // 4️⃣ Use context in other components
+  const { count } = useCounterStore();
+  return <span>{count}</span>;
+}
+
+function App() {
+  // 5️⃣ DO NOT wrap your components with Provider
+  return (
+    <>
+      <Count />
+      <Button />
+    </>
+  );
+}
+```
+
+Advanced Example
+
+```jsx
+import React, { useState, useCallback } from "react";
+import create from "zusteller";
+
+// 1️⃣ Create a custom hook that receives props
+function useCounter({ initialCount = 0 }) {
+  const [count, setCount] = useState(initialCount);
+  // 2️⃣ Wrap your updaters with useCallback or use dispatch from useReducer
+  const increment = useCallback(() => setCount(prev => prev + 1), []);
+  return { count, increment };
+}
+
+// 3️⃣ Wrap your hook with the constate factory splitting the values
+// 3.5 Pass props to your hook
+const useCounterStore = create(useCounter, { initialCount: 10 });
+
+function Button() {
+  // 4️⃣ Use the updater context that will never trigger a re-render
+  // 4.5 we get at it via our selector
+  const increment = useCounterStore(s => s.increment);
+  return <button onClick={increment}>+</button>;
+}
+
+function Count() {
+  // 5️⃣ Use the state context in other components
+  // 5.5 Use the selector to only subscribe to the count
+  const count = useCount(s => s.count);
+  return <span>{count}</span>;
+}
+
+function App() {
+  // 6️⃣ DO NOT wrap your components with Provider 
+  return (
+    <>
+      <Count />
+      <Button />
+    </>
+  );
 }
 ```
   
