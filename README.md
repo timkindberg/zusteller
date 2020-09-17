@@ -4,12 +4,14 @@ Your global state savior. "Just hooks" + [zustand](https://github.com/react-spri
 
 ## Disclaimer 
 
-Zusteller is brand new and under development. However, it's a tiny library without much to it.
+Zusteller is brand new, experimental, and under development.
 
 To enable the use of hooks within zustand **we render a React element into an HTMLElement in memory and it runs the hook.** 
 When the hook result changes, we update the zustand store. 
 
-We need more validation that this approach doesn't introduce any unexpected or dangerous bugs.
+We need more validation that this approach is performant and doesn't introduce any unexpected or dangerous bugs.
+
+At the very minimum it serves as a proposal for how canonical React global state might be handled. 
 
 ## Motivation:
 
@@ -76,11 +78,11 @@ const useStore = create(() => {
   return useStore('Hello')
 })
 
-const useStore = create() => {
+const useStore = create(() => {
   const [foo, setFoo] = useState()
   const [bar, setBar] = useState()
-  ... do some logic
-  return ... some things ...
+  //... do some logic
+  return //... some things ...
 })
 ```
 
@@ -148,289 +150,441 @@ const Component = () => {
 }
 ```
 
-## Let's Recreate Zustand's Doc Examples
 
-> Let's recreate the first example from zustand's page using zusteller
 
-First create your store, your store is a hook and so is your state inside.
 
-```js
-import create from 'zusteller'
 
-const useStore = create(() => {
-  const [bears, setBears] = useState(0)
-  const increasePopulation = () => setBears(prev => prev + 1)
-  const removeAllBears = () => setBears(0)
-  return { bears, increasePopulation, removeAllBears }
-})
-```
 
-Then use your hook, no Providers! This part is the **same** as zustand!
 
-```jsx
-function BearCounter() {
-  const bears = useStore(state => state.bears)
-  return <h1>{bears} around here ...</h1>
-}
 
-function Controls() {
-  const increasePopulation = useStore(state => state.increasePopulation)
-  return <button onClick={increasePopulation}>one up</button>
-}
-```
-
-### Async actions
-
-The example from zustand's page. I'd just use react-query for this but let's recreate it anyway.
-
-```js
-import create from 'zusteller'
-
-const useStore = create(() => {
-  const [fishies, setFishies] = useState({})
-  const fetch = async pond => {
-    const response = await fetch(pond)
-    setFishies(await response.json())
-  }
-})
-```
-
-Oh wait, but now we can compose other hooks! So we *can* use react-query. Would you look at that?
-
-```js
-import create from 'zusteller'
-import { useQuery } from 'react-query'
-
-const useStore = create(() => {
-  const [pond, setPond] = useState('foo')
-  const { data, ...queryInfo } = useQuery('fishies', () => fetch(`/api/${pond}`))
-  // Maybe you need to alter the response in some way?
-  // Who knows why people need global state... :shrug
-  const fishies = data.map(fish => fish.slippery = true)
-  return {fishies, queryInfo, setPond}
-})
-
-```
-
-### Reading/writing state and reacting to changes outside of components
-
-Works just like zustand.
-
-> Except there is no `setState` prototype method. You must use methods exposed by
-your hook to modify the internal hook's state.
-
-```js
-const useStore = create(useState, { paw: true, snout: true, fur: true })
-
-// Getting non-reactive fresh state
-const paw = useStore.getState().paw
-// Listening to all changes, fires on every change
-const unsub1 = useStore.subscribe(console.log)
-// Listening to selected changes, in this case when "paw" changes
-const unsub2 = useStore.subscribe(console.log, state => state.paw)
-// Subscribe also supports an optional equality function
-const unsub3 = useStore.subscribe(console.log, state => [state.paw, state.fur], shallow)
-// Updating state, will trigger listeners
-const [, setState] = useStore.getState()
-setState(prev => ({ ...prev, paw: false }))
-// Unsubscribe listeners
-unsub1()
-unsub2()
-unsub3()
-// Destroying the store (removing all listeners)
-useStore.destroy()
-```
-
-### Using zusteller without React
-
-Not possible. Use zustand. Zusteller uses hooks, and hooks must be run using react and react-dom.
-
-### Want to use immer? 
-
-Use a 3rd party immer hook or write your own
-
-```js
-import create from 'zusteller'
-import produce from 'immer'
-
-const useImmerState = initialState => {
-    const [state, setState] = useState(initialState)
-    const setImmerState = useCallback(setter => setState(produce(setter)), [])
-    return [state, setImmerState]
-}
-
-const useStore = create(useImmerState, { lush: { forrest: { contains: { a: "bear" } } } })
-
-function Component() {
-    const [state, setState] = useStore()
-    setState(state => {
-      state.lush.forrest.contains = null
-    })
-}
-```
-
-### Can't live without redux-like reducers and action types?
-
-No judgement I guess. Here's how you do it, you just use `useReducer`. Simple.
-
-```js
-import create from 'zusteller'
-import { useReducer } from 'react'
-
-const types = { increase: "INCREASE", decrease: "DECREASE" }
-
-const reducer = (state, { type, by = 1 }) => {
-  switch (type) {
-    case types.increase: return { grumpiness: state.grumpiness + by }
-    case types.decrease: return { grumpiness: state.grumpiness - by }
-  }
-}
-
-const useStore = create(useReducer, reducer, {grumpiness: 0})
-
-function Component() {
-  const [state, dispatch] = useStore()
-  dispatch({ type: types.increase, by: 2 })
-}
-```
-
-## Let's Recreate Constate's Doc Examples
-
-```jsx
-import React, { useState } from "react";
-import create from "zusteller";
-
-// 1️⃣ Create a custom hook as usual
-function useCounter() {
-  const [count, setCount] = useState(0);
-  const increment = () => setCount(prevCount => prevCount + 1);
-  return { count, increment };
-}
-
-// 2️⃣ Wrap your hook with the create function
-const useCounterStore = create(useCounter);
-
-function Button() {
-  // 3️⃣ Use context instead of custom hook
-  const { increment } = useCounterStore();
-  return <button onClick={increment}>+</button>;
-}
-
-function Count() {
-  // 4️⃣ Use context in other components
-  const { count } = useCounterStore();
-  return <span>{count}</span>;
-}
-
-function App() {
-  // 5️⃣ DO NOT wrap your components with Provider
-  return (
-    <>
-      <Count />
-      <Button />
-    </>
-  );
-}
-```
-
-Advanced Example
-
-```jsx
-import React, { useState, useCallback } from "react";
-import create from "zusteller";
-
-// 1️⃣ Create a custom hook that receives props
-function useCounter({ initialCount = 0 }) {
-  const [count, setCount] = useState(initialCount);
-  // 2️⃣ Wrap your updaters with useCallback or use dispatch from useReducer
-  const increment = useCallback(() => setCount(prev => prev + 1), []);
-  return { count, increment };
-}
-
-// 3️⃣ Wrap your hook with the constate factory splitting the values
-// 3.5 Pass props to your hook
-const useCounterStore = create(useCounter, { initialCount: 10 });
-
-function Button() {
-  // 4️⃣ Use the updater context that will never trigger a re-render
-  // 4.5 we get at it via our selector
-  const increment = useCounterStore(s => s.increment);
-  return <button onClick={increment}>+</button>;
-}
-
-function Count() {
-  // 5️⃣ Use the state context in other components
-  // 5.5 Use the selector to only subscribe to the count
-  const count = useCount(s => s.count);
-  return <span>{count}</span>;
-}
-
-function App() {
-  // 6️⃣ DO NOT wrap your components with Provider 
-  return (
-    <>
-      <Count />
-      <Button />
-    </>
-  );
-}
-```
+<details>
+  <summary>Migrate Zustand's Doc Examples</summary>
   
-### What about `React.Context`?
+  First create your store, your store is a hook and so is your state inside.
+  
+  ```js
+  import create from 'zusteller'
+  
+  const useStore = create(() => {
+    const [bears, setBears] = useState(0)
+    const increasePopulation = () => setBears(prev => prev + 1)
+    const removeAllBears = () => setBears(0)
+    return { bears, increasePopulation, removeAllBears }
+  })
+  ```
+  
+  Then use your hook, no Providers! This part is the **same** as zustand!
+  
+  ```jsx
+  function BearCounter() {
+    const bears = useStore(state => state.bears)
+    return <h1>{bears} around here ...</h1>
+  }
+  
+  function Controls() {
+    const increasePopulation = useStore(state => state.increasePopulation)
+    return <button onClick={increasePopulation}>one up</button>
+  }
+  ```
+  
+  ### Async actions
+  
+  The example from zustand's page. I'd just use react-query for this but let's recreate it anyway.
+  
+  ```js
+  import create from 'zusteller'
+  
+  const useStore = create(() => {
+    const [fishies, setFishies] = useState({})
+    const fetch = async pond => {
+      const response = await fetch(pond)
+      setFishies(await response.json())
+    }
+  })
+  ```
+  
+  Oh wait, but now we can compose other hooks! So we *can* use react-query. Would you look at that?
+  
+  ```js
+  import create from 'zusteller'
+  import { useQuery } from 'react-query'
+  
+  const useStore = create(() => {
+    const [pond, setPond] = useState('foo')
+    const { data, ...queryInfo } = useQuery('fishies', () => fetch(`/api/${pond}`))
+    // Maybe you need to alter the response in some way?
+    // Who knows why people need global state... :shrug
+    const fishies = data.map(fish => fish.slippery = true)
+    return {fishies, queryInfo, setPond}
+  })
+  
+  ```
+  
+  ### Reading/writing state and reacting to changes outside of components
+  
+  Works just like zustand.
+  
+  > Except there is no `setState` prototype method. You must use methods exposed by
+  your hook to modify the internal hook's state.
+  
+  ```js
+  const useStore = create(useState, { paw: true, snout: true, fur: true })
+  
+  // Getting non-reactive fresh state
+  const paw = useStore.getState().paw
+  // Listening to all changes, fires on every change
+  const unsub1 = useStore.subscribe(console.log)
+  // Listening to selected changes, in this case when "paw" changes
+  const unsub2 = useStore.subscribe(console.log, state => state.paw)
+  // Subscribe also supports an optional equality function
+  const unsub3 = useStore.subscribe(console.log, state => [state.paw, state.fur], shallow)
+  // Updating state, will trigger listeners
+  const [, setState] = useStore.getState()
+  setState(prev => ({ ...prev, paw: false }))
+  // Unsubscribe listeners
+  unsub1()
+  unsub2()
+  unsub3()
+  // Destroying the store (removing all listeners)
+  useStore.destroy()
+  ```
+  
+  ### Using zusteller without React
+  
+  Not possible. Use zustand. Zusteller uses hooks, and hooks must be run using react and react-dom.
+  
+  ### Want to use immer? 
+  
+  Use a 3rd party immer hook or write your own
+  
+  ```js
+  import create from 'zusteller'
+  import produce from 'immer'
+  
+  const useImmerState = initialState => {
+      const [state, setState] = useState(initialState)
+      const setImmerState = useCallback(setter => setState(produce(setter)), [])
+      return [state, setImmerState]
+  }
+  
+  const useStore = create(useImmerState, { lush: { forrest: { contains: { a: "bear" } } } })
+  
+  function Component() {
+      const [state, setState] = useStore()
+      setState(state => {
+        state.lush.forrest.contains = null
+      })
+  }
+  ```
+  
+  ### Can't live without redux-like reducers and action types?
+  
+  No judgement I guess. Here's how you do it, you just use `useReducer`. Simple.
+  
+  ```js
+  import create from 'zusteller'
+  import { useReducer } from 'react'
+  
+  const types = { increase: "INCREASE", decrease: "DECREASE" }
+  
+  const reducer = (state, { type, by = 1 }) => {
+    switch (type) {
+      case types.increase: return { grumpiness: state.grumpiness + by }
+      case types.decrease: return { grumpiness: state.grumpiness - by }
+    }
+  }
+  
+  const useStore = create(useReducer, reducer, {grumpiness: 0})
+  
+  function Component() {
+    const [state, dispatch] = useStore()
+    dispatch({ type: types.increase, by: 2 })
+  }
+  ```
+</details>
 
-Ok you got me! You found the missing feature :(
 
-This wouldn't work.
 
-```js
-// Remember, this hook is being run in an isolated React element in memory!
-// It will not pick up this context value, because it's not in your app's
-// React tree.
-const useSomeContextVal = () => {
-  return useContext(SomeContext)
-}
 
-const useStore = create(useSomeContextVal)
-```
 
-One way we could fix this in the future is by returning a React element from `create`.
-You could then place this element anywhere as your Context.Consumer location.
 
-```js
-const SomeContext = React.createContext()
 
-// This is not yet possible, just showing an idea
-// Maybe we have an additional `create.withManualInsert`
-// Idk what name to give it...
-const useStore = create.withManualInsert(() => {
-  return useContext(SomeContext)
-})
 
-const App = () => {
-  return (
-    <SomeContext.Provider>
-      <useStore.Store /> // Now useStore will pick up the context properly
-    </SomeContext.Provider>
-  )
-}
-```
+<details>
+  <summary>Migrate Constate's Doc Examples</summary>
+  
+  ```jsx
+  import React, { useState } from "react";
+  import create from "zusteller";
+  
+  // 1️⃣ Create a custom hook as usual
+  function useCounter() {
+    const [count, setCount] = useState(0);
+    const increment = () => setCount(prevCount => prevCount + 1);
+    return { count, increment };
+  }
+  
+  // 2️⃣ Wrap your hook with the create function
+  const useCounterStore = create(useCounter);
+  
+  function Button() {
+    // 3️⃣ Use context instead of custom hook
+    const { increment } = useCounterStore();
+    return <button onClick={increment}>+</button>;
+  }
+  
+  function Count() {
+    // 4️⃣ Use context in other components
+    const { count } = useCounterStore();
+    return <span>{count}</span>;
+  }
+  
+  function App() {
+    // 5️⃣ DO NOT wrap your components with Provider
+    return (
+      <>
+        <Count />
+        <Button />
+      </>
+    );
+  }
+  ```
+  
+  Advanced Example
+  
+  ```jsx
+  import React, { useState, useCallback } from "react";
+  import create from "zusteller";
+  
+  // 1️⃣ Create a custom hook that receives props
+  function useCounter({ initialCount = 0 }) {
+    const [count, setCount] = useState(initialCount);
+    // 2️⃣ Wrap your updaters with useCallback or use dispatch from useReducer
+    const increment = useCallback(() => setCount(prev => prev + 1), []);
+    return { count, increment };
+  }
+  
+  // 3️⃣ Wrap your hook with the constate factory splitting the values
+  // 3.5 Pass props to your hook
+  const useCounterStore = create(useCounter, { initialCount: 10 });
+  
+  function Button() {
+    // 4️⃣ Use the updater context that will never trigger a re-render
+    // 4.5 we get at it via our selector
+    const increment = useCounterStore(s => s.increment);
+    return <button onClick={increment}>+</button>;
+  }
+  
+  function Count() {
+    // 5️⃣ Use the state context in other components
+    // 5.5 Use the selector to only subscribe to the count
+    const count = useCount(s => s.count);
+    return <span>{count}</span>;
+  }
+  
+  function App() {
+    // 6️⃣ DO NOT wrap your components with Provider 
+    return (
+      <>
+        <Count />
+        <Button />
+      </>
+    );
+  }
+  ```
+</details>
 
-Maybe we also have a way to return a full context. For a `constate` flavor.
 
-```js
-// This is not yet possible, just showing an idea
-// Maybe we have an additional `create.withContext`
-const useStore = create.withContext(MyContext => () => {
-  return useContext(MyContext)
-})
 
-const App = () => {
-  return (
-    // Now useStore has both a Provider AND a Store insertion point :shrug??
-    <useStore.Provider>
-      <useStore.Store />
-    </useStore.Provider>
-  )
-}
 
-```
+
+
+
+
+<details>
+  <summary>Migrate Recoil's Tutorial</summary>
+  
+  ```js
+  const useTodoListStore = create(() => {
+    // I'm gonna use this immer hook... because it'll make mutations easier
+    // You can see the implementation up above somewhere
+    const [todoList, setTodoList] = useImmerState([])
+    return { todoList }
+  })
+  ```
+  
+  ```jsx
+  function TodoList() {
+    const todoList = useTodoListStore(s => s.todoList);
+  
+    return (
+      <>
+        {}
+        {}
+        <TodoItemCreator />
+  
+        {todoList.map((todoItem) => (
+          <TodoItem key={todoItem.id} item={todoItem} />
+        ))}
+      </>
+    );
+  }
+  ```
+  
+  ```jsx
+  // Modify our hook to add the "addTodo" logic **there**
+  // We should keep the business logic together
+  const useTodoListStore = create(() => {
+    const [todoList, setTodoList] = useImmerState([])
+  
+    // Wrap these bad boys in a memo so they won't cause rerenders
+    // when they are selected
+    const todoActions = useMemo(() => ({
+      add: text => setTodoList(draft => {
+        draft.push({ id: getId(), text, isComplete: false })
+      })
+    }), [])
+  
+    return { todoList, todoActions }
+  })
+      
+  
+  function TodoItemCreator() {
+    const [inputValue, setInputValue] = useState('');
+    const todoActions = useTodoListStore(s => s.todoActions);
+  
+    const addItem = () => {
+      todoActions.add(inputValue)
+      setInputValue('');
+    };
+  
+    const onChange = ({target: {value}}) => {
+      setInputValue(value);
+    };
+  
+    return (
+      <div>
+        <input type="text" value={inputValue} onChange={onChange} />
+        <button onClick={addItem}>Add</button>
+      </div>
+    );
+  }
+  
+  let id = 0;
+  function getId() {
+    return id++;
+  }
+  ```
+  
+  ```jsx
+  // Modify our hook to add the Edit, Toggle and Delete logic
+  // Again, trying to keep busineses logic together
+  const useTodoListStore = create(() => {
+    const [todoList, setTodoList] = useImmerState([])
+  
+    // Wrap these bad boys in a memo so they won't cause rerenders
+    // when they are selected
+    const todoActions = useMemo(() => ({
+      add: text => setTodoList(draft => {
+        draft.push({ id: getId(), text, isComplete: false })
+      }),
+      edit: (todo, text) => setTodoList(draft => {
+        const todo = draft.find(t => t.id === todo.id)
+        todo.text = text
+      }),
+      toggle: todo => setTodoList(draft => {
+        const todo = draft.find(t => t.id === todo.id)
+        todo.isComplete = !todo.isComplete
+      }),
+      delete: todo => setTodoList(draft => {
+        return draft.filter(t => t.id !== todo.id)
+      })
+    }), [])
+  
+    return { todoList, todoActions }
+  })
+  
+  function TodoItem({item}) {
+    const todoActions = useTodoListStore(s => s.todoActions)
+  
+    return (
+      <div>
+        <input type="text" value={item.text} onChange={e => todoActions.edit(item, e.target.value)} />
+        <input
+          type="checkbox"
+          checked={item.isComplete}
+          onChange={() => todoActions.toggle(item)}
+        />
+        <button onClick={() => deleteItem(item)}>X</button>
+      </div>
+    );
+  }
+  ```
+</details>
+
+
+
+
+
+
+
+<details>
+  <summary>What about `React.Context`?</summary
+  
+  Ok you got me! You found the missing feature :(
+  
+  This wouldn't work.
+  
+  ```js
+  // Remember, this hook is being run in an isolated React element in memory!
+  // It will not pick up this context value, because it's not in your app's
+  // React tree.
+  const useSomeContextVal = () => {
+    return useContext(SomeContext)
+  }
+
+  const useStore = create(useSomeContextVal)
+  ```
+  
+  One way we could fix this in the future is by returning a React element from `create`.
+  You could then place this element anywhere as your Context.Consumer location.
+  
+  ```jsx
+  const SomeContext = React.createContext()
+  
+  // This is not yet possible, just showing an idea
+  // Maybe we have an additional `create.withManualInsert`
+  // Idk what name to give it...
+  const useStore = create.withManualInsert(() => {
+    return useContext(SomeContext)
+  })
+  
+  const App = () => {
+    return (
+      <SomeContext.Provider>
+        <useStore.Store /> // Now useStore will pick up the context properly
+      </SomeContext.Provider>
+    )
+  }
+  ```
+  
+  Maybe we also have a way to return a full context. For a `constate` flavor.
+  
+  ```jsx
+  // This is not yet possible, just showing an idea
+  // Maybe we have an additional `create.withContext`
+  const useStore = create.withContext(MyContext => () => {
+    return useContext(MyContext)
+  })
+  
+  const App = () => {
+    return (
+      // Now useStore has both a Provider AND a Store insertion point :shrug??
+      <useStore.Provider>
+        <useStore.Store />
+      </useStore.Provider>
+    )
+  }
+  
+  ```
+</details>
