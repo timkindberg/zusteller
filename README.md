@@ -531,60 +531,60 @@ const Component = () => {
 <details>
   <summary>What about `React.Context`?</summary
   
-  Ok you got me! You found the missing feature :(
-  
-  This wouldn't work.
-  
-  ```js
-  // Remember, this hook is being run in an isolated React element in memory!
-  // It will not pick up this context value, because it's not in your app's
-  // React tree.
-  const useSomeContextVal = () => {
-    return useContext(SomeContext)
-  }
+Ok you got me! You found the missing feature :(
 
-  const useStore = create(useSomeContextVal)
-  ```
-  
-  One way we could fix this in the future is by returning a React element from `create`.
-  You could then place this element anywhere as your Context.Consumer location.
-  
-  ```jsx
-  const SomeContext = React.createContext()
-  
-  // This is not yet possible, just showing an idea
-  // Maybe we have an additional `create.withManualInsert`
-  // Idk what name to give it...
-  const useStore = create.withManualInsert(() => {
-    return useContext(SomeContext)
-  })
-  
-  const App = () => {
-    return (
-      <SomeContext.Provider>
-        <useStore.Store /> // Now useStore will pick up the context properly
-      </SomeContext.Provider>
-    )
-  }
-  ```
-  
-  Maybe we also have a way to return a full context. For a `constate` flavor.
-  
-  ```jsx
-  // This is not yet possible, just showing an idea
-  // Maybe we have an additional `create.withContext`
-  const useStore = create.withContext(MyContext => () => {
-    return useContext(MyContext)
-  })
-  
-  const App = () => {
-    return (
-      // Now useStore has both a Provider AND a Store insertion point :shrug??
-      <useStore.Provider>
-        <useStore.Store />
-      </useStore.Provider>
-    )
-  }
-  
-  ```
+This wouldn't work.
+
+```js
+// Remember, this hook is being run in an isolated React element in memory!
+// It will not pick up this context value, because it's not in your app's
+// React tree.
+const useSomeContextVal = () => {
+  return useContext(SomeContext)
+}
+
+const useStore = create(useSomeContextVal)
+```
+
+One way we could fix this in the future is by returning a React element from `create`.
+You could then place this element anywhere as your Context.Consumer location.
+
+```jsx
+const SomeContext = React.createContext()
+
+// This is not yet possible, just showing an idea
+// Maybe we have an additional `create.withManualInsert`
+// Idk what name to give it...
+const useStore = create.withManualInsert(() => {
+  return useContext(SomeContext)
+})
+
+const App = () => {
+  return (
+    <SomeContext.Provider>
+      <useStore.Store /> // Now useStore will pick up the context properly
+    </SomeContext.Provider>
+  )
+}
+```
+
+Maybe we also have a way to return a full context. For a `constate` flavor.
+
+```jsx
+// This is not yet possible, just showing an idea
+// Maybe we have an additional `create.withContext`
+const useStore = create.withContext(MyContext => () => {
+  return useContext(MyContext)
+})
+
+const App = () => {
+  return (
+    // Now useStore has both a Provider AND a Store insertion point :shrug??
+    <useStore.Provider>
+      <useStore.Store />
+    </useStore.Provider>
+  )
+}
+
+```
 </details>
