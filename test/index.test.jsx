@@ -5,6 +5,11 @@ import * as React from 'react';
 import { useReducer, useState } from 'react';
 import create from '../src/index';
 
+const debugEnabled = false;
+const debug = (...args) => (debugEnabled ? console.log(...args) : void 0);
+
+const tick = async (ms = 0) => await new Promise(res => setTimeout(res, ms));
+
 describe('render count sanity checks', () => {
   it('renders a baseline # of times', () => {
     const hookRender = jest.fn();
@@ -16,7 +21,7 @@ describe('render count sanity checks', () => {
     };
     const Title = () => {
       cmpRender();
-      const title = useWelcome();
+      const [title] = useWelcome();
       return <h1>{title}</h1>;
     };
 
@@ -27,9 +32,9 @@ describe('render count sanity checks', () => {
 });
 
 describe('create', () => {
-  it('accepts hook args during create (simple)', async () => {
+  it('Single useState', async () => {
     const cmpRender = jest.fn();
-    const useTitle = create(useState, 'Welcome');
+    const useTitle = create(() => useState('Welcome'));
 
     const Title = () => {
       cmpRender();
@@ -43,19 +48,15 @@ describe('create', () => {
     expect(cmpRender.mock.calls).toHaveLength(1);
   });
 
-  it('accepts hook args during create (multiple)', async () => {
+  it('Double useState', async () => {
     const hookRender = jest.fn();
     const cmpRender = jest.fn();
-    const useTitle = create(
-      (initialMsg, initialName) => {
-        hookRender();
-        const [msg] = useState(initialMsg);
-        const [name] = useState(initialName);
-        return `${msg}, ${name}`;
-      },
-      'Welcome',
-      'Tim'
-    );
+    const useTitle = create(() => {
+      hookRender();
+      const [msg] = useState('Welcome');
+      const [name] = useState('Tim');
+      return `${msg}, ${name}`;
+    });
 
     const Title = () => {
       cmpRender();
@@ -84,18 +85,23 @@ describe('create', () => {
 
     const Title = () => {
       titleRender();
+      debug('Title Render');
       const title = useTitle(s => s[0]);
+      debug('Title', title);
       return <h1>{title}</h1>;
     };
 
     const TitleInput = () => {
       titleInputRender();
+      debug('TitleInput Render');
       const [title, setTitle] = useTitle();
+      debug('TitleInput', title);
       return <input value={title} onChange={e => setTitle(e.target.value)} />;
     };
 
     const TitleButton = () => {
       titleButtonRender();
+      debug('TitleButton Render');
       const setTitle = useTitle(s => s[1]);
       return <button onClick={() => setTitle('Welcome!')} />;
     };
@@ -120,7 +126,9 @@ describe('create', () => {
 
     expect(screen.getByRole('heading').textContent).toEqual('Welcome');
 
+    debug('----- type');
     await userEvent.type(screen.getByRole('textbox'), ' to Hell!');
+    await tick();
     expect(hookRender.mock.calls).toHaveLength(10); // nine letters typed
     expect(titleRender.mock.calls).toHaveLength(10);
     expect(titleInputRender.mock.calls).toHaveLength(10);
@@ -130,7 +138,7 @@ describe('create', () => {
     expect(screen.getByRole('heading').textContent).toEqual('Welcome to Hell!');
 
     act(() => {
-      const [, setTitle] = useTitle.getState();
+      const [, setTitle] = useTitle.withArgs().getState();
       setTitle('jk it is heaven');
     });
 
@@ -144,25 +152,25 @@ describe('create', () => {
   });
 
   describe('atomFamily (WIP)', () => {
-    it('makes one', () => {
+    it('makes one', async () => {
       const useFoo = create((arg = '') => {
         const [val, setVal] = useState('foo');
-        console.log('useFoo', { val, arg });
+        debug('useFoo', { val, arg });
         return [val + arg, setVal];
       });
       expect(useFoo.family).toEqual({});
 
       const Foo1Cmp = () => {
-        console.log('foo1');
-        console.log('foo1 hook result', useFoo());
-        const [foo] = useFoo() ?? [];
+        debug('foo1!');
+        const [foo] = useFoo();
+        debug('foo1 hook result', foo);
         return <div>{foo}</div>;
       };
 
       const Foo2Cmp = () => {
-        console.log('foo2');
-        console.log('foo2 hook result', useFoo());
-        const [foo] = useFoo() ?? [];
+        debug('foo2!');
+        const [foo] = useFoo();
+        debug('foo2 hook result', foo);
         return <div>{foo}</div>;
       };
 
@@ -175,20 +183,24 @@ describe('create', () => {
         );
       };
 
+      debug('!!! Render Test');
       render(<App />);
 
       expect(screen.getAllByText('foo')).toHaveLength(2);
       expect(useFoo.family).toEqual({
-        undefined: { node: expect.anything(), storeHook: expect.anything() },
+        '[]': expect.any(Function),
       });
 
+      debug('!!! External setVal');
       act(() => {
-        const [, setVal] = useFoo.getState();
+        const [, setVal] = useFoo.withArgs().getState();
         setVal('bar');
       });
 
+      await new Promise(res => setTimeout(res, 1000));
+
+      expect(await screen.findAllByText('bar')).toHaveLength(2);
       expect(screen.queryAllByText('foo')).toHaveLength(0);
-      expect(screen.getAllByText('bar')).toHaveLength(2);
     });
 
     it('does things', async () => {
@@ -201,11 +213,13 @@ describe('create', () => {
       });
 
       const GreetingTim = () => {
+        debug('GreetingTim Render');
         const greeting = useFullGreeting(['Tim']);
         return <h1>{greeting}</h1>;
       };
 
       const GreetingBob = () => {
+        debug('GreetingBob Render');
         const greeting = useFullGreeting(['Bob']);
         return <h1>{greeting}</h1>;
       };
@@ -227,22 +241,24 @@ describe('create', () => {
 
       render(<TestBed />);
 
-      expect(screen.getByRole('heading').textContent).toEqual('Welcome');
+      let headings = screen.getAllByRole('heading');
+      expect(headings[0].textContent).toEqual('Welcome Tim');
+      expect(headings[1].textContent).toEqual('Welcome Bob');
 
       await userEvent.type(screen.getByRole('textbox'), ' to Hell!');
 
-      expect(screen.getByRole('heading').textContent).toEqual(
-        'Welcome to Hell!'
-      );
+      headings = screen.getAllByRole('heading');
+      expect(headings[0].textContent).toEqual('Welcome to Hell! Tim');
+      expect(headings[1].textContent).toEqual('Welcome to Hell! Bob');
 
       act(() => {
-        const [, setTitle] = useTitle.getState();
+        const [, setTitle] = useGreeting.withArgs().getState();
         setTitle('jk it is heaven');
       });
 
-      expect(screen.getByRole('heading').textContent).toEqual(
-        'jk it is heaven'
-      );
+      headings = screen.getAllByRole('heading');
+      expect(headings[0].textContent).toEqual('jk it is heaven Tim');
+      expect(headings[1].textContent).toEqual('jk it is heaven Bob');
     });
   });
 
@@ -292,7 +308,7 @@ describe('create', () => {
     expect(screen.getByRole('heading').textContent).toEqual('stopped');
 
     act(() => {
-      const [, dispatch] = useStatus.getState();
+      const [, dispatch] = useStatus.withArgs().getState();
       dispatch({ type: 'start' });
     });
     expect(screen.getByRole('heading').textContent).toEqual('started');
@@ -380,8 +396,8 @@ describe('create', () => {
     );
 
     act(() => {
-      const [, setMsg] = useMsg.getState();
-      const [, setName] = useName.getState();
+      const [, setMsg] = useMsg.withArgs().getState();
+      const [, setName] = useName.withArgs().getState();
       setMsg('Welcome to the future');
       setName('React Devs');
     });
@@ -474,7 +490,7 @@ describe('create', () => {
     );
 
     act(() => {
-      const { setMsg, setName } = useWelcomeMsg.getState();
+      const { setMsg, setName } = useWelcomeMsg.withArgs().getState();
       setMsg('Welcome to the future');
       setName('React Devs');
     });
@@ -490,7 +506,7 @@ describe('create', () => {
     const contextCountRender = jest.fn();
     const contextButtonRender = jest.fn();
     const appRender = jest.fn();
-    const useStore = create(useState, 0);
+    const useStore = create(() => useState(0));
     const [Provider, useCountContext] = constate(() => useState(0));
 
     const StellerCount = () => {

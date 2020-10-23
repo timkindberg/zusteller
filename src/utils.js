@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 export function useImmediateEffect(effect, deps) {
   const cleanup = useRef();
@@ -66,4 +66,18 @@ function isPlainObject(o) {
 
 function hasObjectPrototype(o) {
   return Object.prototype.toString.call(o) === '[object Object]';
+}
+
+export function usePrevious(value) {
+  // The ref object is a generic container whose current property is mutable ...
+  // ... and can hold any value, similar to an instance property on a class
+  const ref = useRef();
+
+  // Store current value in ref
+  useEffect(() => {
+    ref.current = value;
+  }, [value]); // Only re-run if value changes
+
+  // Return previous value (happens before update in useEffect above)
+  return ref.current;
 }

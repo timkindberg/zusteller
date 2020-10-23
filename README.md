@@ -729,51 +729,44 @@ function UserInfo(id) {
   return <div>{data?.name}</div>;
 }
 ```
+
 But that's cheating... so what if we *needed* to pass parameters to our hook? Hmm...
+ok let's just pretend react-query wasn't invented yet.
 
 ```jsx
-const userNameQuery = selectorFamily({
-  key: 'UserName',
-  get: userID => async () => {
-    const response = await myDBQuery({userID});
-    if (response.error) {
-      throw response.error;
-    }
-    return response.name;
-  },
-});
+// So this is basically a poor man's react-query
+const useUserNameStore = create((userID) => {
+  const [name, setName] = useState('')
+  const [error, setError] = useState()
+  useEffect(() => {
+    myDBQuery({userID}).then(response => {
+      setResponse(response.error ?? response.name)
+    });
+  }, [id])
+  if (error) return error
+  return name
+})
 
-function UserInfo({userID}) {
-  const userName = useRecoilValue(userNameQuery(userID));
-  return <div>{userName}</div>;
+function UserInfo({ id }) {
+  // Provide a hookArgs array as the first param to the store hook
+  const { data } = useUserNameStore([id])
+  return <div>{data?.name}</div>;
 }
+```
 
-import { useQuery } from 'react-query'
+Or we could use a 3rd party library hook like react-use-promise. It's a little nicer,
+but again react-query would just be better here. But this illustrates passing in parameters.
+```jsx
+import usePromise from 'react-use-promise'
 
-const useUserNameStore = create(() => {
-  const [id] = useCurrentUserIDStore()
-  const { data } = useQuery(['user/details', id], (_, id) => myDBQuery({ userID: id }))
-  return data?.name;
+const useUserNameStore = create((userID) => {
+  const [result, error] = usePromise(myDBQuery({userID}))
+  return error ?? result.name
 })
 
 function UserInfo(id) {
   const { data } = useUserNameStore([id])
   return <div>{data?.name}</div>;
-}
-
-
-function MyApp() {
-  return (
-    <RecoilRoot>
-      <ErrorBoundary>
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <UserInfo userID={1}/>
-          <UserInfo userID={2}/>
-          <UserInfo userID={3}/>
-        </React.Suspense>
-      </ErrorBoundary>
-    </RecoilRoot>
-  );
 }
 ```
 </details>

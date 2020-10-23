@@ -1,13 +1,17 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import ReactDOM from 'react-dom';
+import { useEffect, useMemo, useRef } from 'react';
 import zcreate from 'zustand';
-import { serializeHookArgs, useImmediateEffect } from './utils';
+import shallow from 'zustand/shallow';
+import { serializeHookArgs, useImmediateEffect, usePrevious } from './utils';
 
-export default function create(hook, ...defaultHookArgs) {
+const debugEnabled = false;
+const debug = (...args) => (debugEnabled ? console.log(...args) : void 0);
+
+export default function create(useHook, defaultIsEqual) {
   const storeFamily = {};
 
-  function internalSelector(selector) {
+  function internalSelector(selector, id = 0) {
     return ({ value }) => {
+      debug('internalSelector', id, value);
       if (value == null) return value;
       if (typeof selector === 'function') {
         return selector(value);
@@ -15,16 +19,23 @@ export default function create(hook, ...defaultHookArgs) {
       return value;
     };
   }
-  function internalIsEqual(eqFn) {
+  function internalIsEqual(eqFn, i) {
     if (typeof eqFn === 'function') {
       return ({ value: prevValue }, { value: nextValue }) =>
         eqFn(prevValue, nextValue);
     }
     return undefined;
   }
+  const SLAVE = '__ZUSTELLER_SLAVE__';
+  function getHookIfFirstSubscriber(subscriberCount) {
+    if (subscriberCount === 1) return useHook;
+    return () => SLAVE;
+  }
+
+  const subscriberCounts = {};
 
   function useStore(...args) {
-    let hookArgs;
+    let hookArgs = [];
     let selector;
     let isEqual;
     if (Array.isArray(args[0])) {
@@ -34,74 +45,108 @@ export default function create(hook, ...defaultHookArgs) {
       [selector, isEqual] = args;
     }
 
+    // Hook Args Hash
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const hookArgsHash = useMemo(() => serializeHookArgs(hookArgs), hookArgs);
-    const storeHookRef = useRef(() => {});
 
-    console.log({ hookArgs, selector, hash: hookArgsHash });
-
+    // Register a subscribing component by incrementing
+    // the subscriber subscriberCount
+    const subscriberIndexRef = useRef(-1);
     useImmediateEffect(() => {
-      let storeHook;
-      let node;
+      if (subscriberCounts[hookArgsHash] == null) {
+        subscriberCounts[hookArgsHash] = 0;
+      }
+      subscriberCounts[hookArgsHash] = subscriberCounts[hookArgsHash] + 1;
+      subscriberIndexRef.current = subscriberCounts[hookArgsHash];
+      return () => {
+        subscriberCounts[hookArgsHash] = subscriberCounts[hookArgsHash] - 1;
+        subscriberIndexRef.current = -1;
+      };
+    }, []);
+
+    const i = subscriberIndexRef.current;
+    debug(i, 'hash', hookArgsHash);
+    const prevHash = usePrevious(hookArgsHash);
+    if (prevHash !== hookArgsHash)
+      debug('hash changed', { prev: prevHash, next: hookArgsHash });
+    debug(i, '-----------------');
+    debug(i, 'total subscribers', subscriberCounts[hookArgsHash]);
+
+    // Get Hook Result
+    const useHook = getHookIfFirstSubscriber(subscriberIndexRef.current);
+    const result = useHook(...hookArgs);
+    debug(i, 'result', result);
+
+    // Set isEqual
+    if (Array.isArray(result) && !defaultIsEqual) {
+      isEqual = shallow;
+    }
+    if (isEqual == null && defaultIsEqual) {
+      isEqual = defaultIsEqual;
+    }
+
+    // Create or Get Cached Zustand Store Hook
+    const useZStore = useMemo(() => {
+      debug('enter memo');
       const cachedStore = storeFamily[hookArgsHash];
       if (cachedStore) {
-        ({ storeHook, node } = cachedStore);
-        console.log('use cached');
-      } else {
-        storeHook = zcreate(() => ({}));
-        storeHook.hash = hookArgsHash;
-        useStore.getState = () => storeHook.getState().value;
-        useStore.subscribe = (listener, selector, isEqual) =>
-          storeHook.subscribe(
-            listener,
-            internalSelector(selector),
-            internalIsEqual(isEqual)
-          );
-        useStore.destroy = () => storeHook.destroy();
-        node = document.createElement('div');
-        node.setAttribute('id', hookArgsHash);
-        storeFamily[hookArgsHash] = { storeHook, node };
-        console.log('make new');
-        console.log('render');
-        ReactDOM.render(
-          <StoreComponent
-            hook={hook}
-            hookArgs={hookArgs}
-            storeHook={storeHook}
-          />,
-          node
-        );
+        debug(i, 'use cached');
+        return cachedStore;
       }
 
-      storeHookRef.current = storeHook;
-
-      return () => {
-        console.log('unmount');
-        // When we unmount the component using the store, also unmount the store node
-        ReactDOM.unmountComponentAtNode(node);
-      };
+      debug(i, 'make new');
+      const useZStore = zcreate(() => ({ value: result }));
+      const useStoreWrapper = (...args) => useZStore(...args);
+      useStoreWrapper.hash = hookArgsHash;
+      useStoreWrapper.getState = () => useZStore.getState().value;
+      useStoreWrapper.subscribe = (listener, selector, isEqual) =>
+        useZStore.subscribe(
+          listener,
+          internalSelector(selector, i),
+          internalIsEqual(isEqual, i)
+        );
+      useStoreWrapper.destroy = () => useZStore.destroy();
+      storeFamily[hookArgsHash] = useStoreWrapper;
+      return useZStore;
     }, [hookArgsHash]);
 
-    return storeHookRef.current(
-      internalSelector(selector),
-      internalIsEqual(isEqual)
+    const prevUseZStore = usePrevious(useZStore);
+    const prevResult = usePrevious(result);
+    if (prevUseZStore !== useZStore) debug('store changed');
+    if (prevResult !== result)
+      debug('result changed', { prev: prevResult, next: result });
+
+    let resultChanged = true;
+    if (Array.isArray(result) && shallow(prevResult, result))
+      resultChanged = false;
+
+    useEffect(() => {
+      debug(i, 'zustand update effect', result, resultChanged);
+      if (result === SLAVE || !resultChanged) return;
+      debug(i, 'update zustand store with result', result);
+      useZStore.setState({ value: result });
+    }, [useZStore, result]);
+
+    const instanceSelector = internalSelector(selector, i);
+    const storeResult = useZStore(
+      instanceSelector,
+      internalIsEqual(isEqual, i)
     );
+    const returnVal =
+      result === SLAVE ? storeResult : instanceSelector({ value: result });
+    debug(i, 'hookResult', storeResult);
+    debug(i, 'selector result', instanceSelector({ value: result }));
+    debug(i, 'returnVal', returnVal);
+
+    return returnVal;
   }
 
   useStore.family = storeFamily;
+  useStore.withArgs = (hookArgs = []) => {
+    const hookArgsHash = serializeHookArgs(hookArgs);
+    debug('withArgs', storeFamily[hookArgsHash]);
+    return storeFamily[hookArgsHash];
+  };
+  Object.assign(useStore, useStore.withArgs());
   return useStore;
-}
-
-function StoreComponent({
-  hook: useHook,
-  hookArgs = [],
-  storeHook: useZStore,
-}) {
-  const result = useHook(...hookArgs);
-  console.log('StoreComponent render', result);
-  useImmediateEffect(() => {
-    console.log('StoreComponent effect', result);
-    useZStore.setState({ value: result });
-  }, [useZStore, result]);
-  return null;
 }
