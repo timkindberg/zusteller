@@ -842,20 +842,40 @@ function UserInfo(id) {
 <details>
   <summary>What about `React.Context`?</summary>
   
-Ok you got me! You found the missing feature :( Let me know if you want to submit a PR!
+This only partially works. It works ok with global themes or other providers that wrap your whole app.
 
-This wouldn't work.
+But it's can behave badly if you have components sharing the same store but living under different contexts.
 
 ```js
-// Remember, this hook is being run in an isolated React element in memory!
-// It will not pick up this context value, because it's not in your app's
-// React tree.
-const useSomeContextVal = () => {
-  return useContext(SomeContext)
+// Make a Context
+const SomeContext = React.createContext()
+
+// Make a Zusteller store that uses the context
+const useContextStore = create(() => useContext(SomeContext))
+
+// Make a component that uses the zusteller store
+const Component = () => {
+  const value = useContextStore()
+  return <div>{value}</div>
 }
 
-const useStore = create(useSomeContextVal)
+// Have two providers, each a Component in each
+const App = () => {
+  return (
+    <>
+      <SomeContext.Provider value={true}>
+        <Component/>
+      </SomeContext.Provider>
+      <SomeContext.Provider value={false}>
+        <Component/>
+      </SomeContext.Provider>
+    </>
+  )
+}
 ```
+That's because the underlying hook is being run only by the first component that uses the store hook.
+So context will be relative to that first subscribing component. So in the example above, both components
+would like use the value of `true`. So yeah...
 
 One way we could fix this in the future is by returning a React element from `create`.
 You could then place this element anywhere as your Context.Consumer location.
@@ -873,13 +893,14 @@ const useStore = create.withManualInsert(() => {
 const App = () => {
   return (
     <SomeContext.Provider>
-      <useStore.Store /> // Now useStore will pick up the context properly
+      <useStore.ContextConsumerPoint /> // Now all useStore usages will pick up the context from an intentional place
     </SomeContext.Provider>
   )
 }
 ```
 
-Maybe we also have a way to return a full context. For a `constate` flavor.
+Maybe we also have a way to return it's own context. For a `constate` flavor. 
+This would lower the state from global to contextual.
 
 ```jsx
 // This is not yet possible, just showing an idea
