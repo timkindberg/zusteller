@@ -260,6 +260,7 @@ const useStore = create(() => {
     const response = await fetch(pond)
     setFishies(await response.json())
   }
+  return {fishies, fetch}
 })
 ```
 
@@ -288,7 +289,7 @@ Works just like zustand.
 your hook to modify the internal hook's state.
 
 ```js
-const useStore = create(useState, { paw: true, snout: true, fur: true })
+const useStore = create(() => useState({ paw: true, snout: true, fur: true }))
 
 // Getting non-reactive fresh state
 const paw = useStore.getState().paw
@@ -327,7 +328,7 @@ const useImmerState = initialState => {
     return [state, setImmerState]
 }
 
-const useStore = create(useImmerState, { lush: { forrest: { contains: { a: "bear" } } } })
+const useStore = create(() => useImmerState({ lush: { forrest: { contains: { a: "bear" } } } }))
 
 function Component() {
     const [state, setState] = useStore()
@@ -354,7 +355,7 @@ const reducer = (state, { type, by = 1 }) => {
   }
 }
 
-const useStore = create(useReducer, reducer, {grumpiness: 0})
+const useStore = create(() => useReducer(reducer, {grumpiness: 0}))
 
 function Component() {
   const [state, dispatch] = useStore()
@@ -391,13 +392,13 @@ function useCounter() {
 const useCounterStore = create(useCounter);
 
 function Button() {
-  // 3️⃣ Use context instead of custom hook
+  // 3️⃣ Use store hook instead of custom hook
   const { increment } = useCounterStore();
   return <button onClick={increment}>+</button>;
 }
 
 function Count() {
-  // 4️⃣ Use context in other components
+  // 4️⃣ Use store hook in other components
   const { count } = useCounterStore();
   return <span>{count}</span>;
 }
@@ -429,17 +430,17 @@ function useCounter({ initialCount = 0 }) {
 
 // 3️⃣ Wrap your hook with the constate factory splitting the values
 // 3.5 Pass props to your hook
-const useCounterStore = create(useCounter, { initialCount: 10 });
+const useCounterStore = create(() => useCounter({ initialCount: 10 }));
 
 function Button() {
-  // 4️⃣ Use the updater context that will never trigger a re-render
+  // 4️⃣ Select just the increment function that will never trigger a re-render
   // 4.5 we get at it via our selector
   const increment = useCounterStore(s => s.increment);
   return <button onClick={increment}>+</button>;
 }
 
 function Count() {
-  // 5️⃣ Use the state context in other components
+  // 5️⃣ Use the state in other components
   // 5.5 Use the selector to only subscribe to the count
   const count = useCount(s => s.count);
   return <span>{count}</span>;
@@ -604,7 +605,7 @@ function TodoItem({item}) {
   > I only recreate the code blocks not all of the text.
   
 ```js
-const useTodoListFilterStore = create(useState, 'Show All');
+const useTodoListFilterStore = create(() => useState('Show All'));
 ```
 
 ```js
@@ -722,7 +723,7 @@ function TodoListStats() {
 ### Synchronous Example
 
 ```jsx
-const useCurrentUserIDStore = create(useState, 1)
+const useCurrentUserIDStore = create(() => useState(1))
 
 const useCurrentUserNameStore = create(() => {
   const [id] = useCurrentUserIDStore()
@@ -841,7 +842,7 @@ function UserInfo(id) {
 <details>
   <summary>What about `React.Context`?</summary>
   
-Ok you got me! You found the missing feature :(
+Ok you got me! You found the missing feature :( Let me know if you want to submit a PR!
 
 This wouldn't work.
 
