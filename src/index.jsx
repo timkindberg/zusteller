@@ -5,6 +5,8 @@ import { serializeHookArgs, useImmediateEffect, usePrevious } from './utils';
 
 const debugEnabled = false;
 const debug = (...args) => (debugEnabled ? console.log(...args) : void 0);
+const SET_STATE_ERR =
+  'Zusteller stores do not support setState. You must set state via methods returned from your hook.';
 
 export default function create(useHook, defaultIsEqual) {
   const storeFamily = {};
@@ -98,6 +100,9 @@ export default function create(useHook, defaultIsEqual) {
       const useZStore = zcreate(() => ({ value: result }));
       const useStoreWrapper = (...args) => useZStore(...args);
       useStoreWrapper.hash = hookArgsHash;
+      useStoreWrapper.setState = () => {
+        throw new Error(SET_STATE_ERR);
+      };
       useStoreWrapper.getState = () => useZStore.getState().value;
       useStoreWrapper.subscribe = (listener, selector, isEqual) =>
         useZStore.subscribe(
@@ -142,11 +147,36 @@ export default function create(useHook, defaultIsEqual) {
   }
 
   useStore.family = storeFamily;
-  useStore.withArgs = (hookArgs = []) => {
+  useStore.fromArgs = (hookArgs = []) => {
     const hookArgsHash = serializeHookArgs(hookArgs);
-    debug('withArgs', storeFamily[hookArgsHash]);
+    debug('fromArgs', storeFamily[hookArgsHash]);
     return storeFamily[hookArgsHash];
   };
-  Object.assign(useStore, useStore.withArgs());
+  useStore.getState = (hookArgs = []) => {
+    return useStore.fromArgs(hookArgs).getState();
+  };
+  useStore.setState = () => {
+    throw new Error(SET_STATE_ERR);
+  };
+  useStore.subscribe = (...args) => {
+    let hookArgs = [];
+    let listener;
+    let selector;
+    let isEqual;
+    if (Array.isArray(args[0])) {
+      [hookArgs, listener, selector, isEqual] = args;
+    } else {
+      [listener, selector, isEqual] = args;
+    }
+    useStore
+      .fromArgs(hookArgs)
+      .getState()
+      .subscribe(
+        listener,
+        internalSelector(selector),
+        internalIsEqual(isEqual)
+      );
+  };
+  useStore.destroy = (hookArgs = []) => useStore.fromArgs(hookArgs).destroy();
   return useStore;
 }

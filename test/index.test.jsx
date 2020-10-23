@@ -138,7 +138,7 @@ describe('create', () => {
     expect(screen.getByRole('heading').textContent).toEqual('Welcome to Hell!');
 
     act(() => {
-      const [, setTitle] = useTitle.withArgs().getState();
+      const [, setTitle] = useTitle.getState();
       setTitle('jk it is heaven');
     });
 
@@ -193,7 +193,7 @@ describe('create', () => {
 
       debug('!!! External setVal');
       act(() => {
-        const [, setVal] = useFoo.withArgs().getState();
+        const [, setVal] = useFoo.getState();
         setVal('bar');
       });
 
@@ -252,7 +252,7 @@ describe('create', () => {
       expect(headings[1].textContent).toEqual('Welcome to Hell! Bob');
 
       act(() => {
-        const [, setTitle] = useGreeting.withArgs().getState();
+        const [, setTitle] = useGreeting.getState();
         setTitle('jk it is heaven');
       });
 
@@ -308,7 +308,7 @@ describe('create', () => {
     expect(screen.getByRole('heading').textContent).toEqual('stopped');
 
     act(() => {
-      const [, dispatch] = useStatus.withArgs().getState();
+      const [, dispatch] = useStatus.getState();
       dispatch({ type: 'start' });
     });
     expect(screen.getByRole('heading').textContent).toEqual('started');
@@ -396,8 +396,8 @@ describe('create', () => {
     );
 
     act(() => {
-      const [, setMsg] = useMsg.withArgs().getState();
-      const [, setName] = useName.withArgs().getState();
+      const [, setMsg] = useMsg.getState();
+      const [, setName] = useName.getState();
       setMsg('Welcome to the future');
       setName('React Devs');
     });
@@ -490,7 +490,7 @@ describe('create', () => {
     );
 
     act(() => {
-      const { setMsg, setName } = useWelcomeMsg.withArgs().getState();
+      const { setMsg, setName } = useWelcomeMsg.getState();
       setMsg('Welcome to the future');
       setName('React Devs');
     });

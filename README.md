@@ -47,37 +47,40 @@ First import `create` from `zusteller`.
 import create from 'zusteller'
 ```
 
-Pass `create` a hook. Here we pass the `useState` hook provided by React.
+Pass `create` a hook. The simplest way to use it is to pass `useState`.
 
 ```js
 const useStore = create(useState)
 ```
 
-Pass your own custom hook.
-
+But pass your own hooks as well. Here we initialize some state.
 ```js
-const useStore = create(useMyOwnHook)
+const useMyState = () => useState(42)
+const useStore = create(useMyState)
 ```
 
-### Hook args
-
-If the hook takes args, provide them as additional args to `create`.
-
-
+Or pass an inline-anonymous hook
 ```js
-const useStore = create(useState, initialState)
-const useStore = create(useMyOwnHook, initialA, initialB, initialC, ...etc)
+const useStore = create(() => useState(42))
 ```
 
-### Inline anonymous hook
+All three of the above are valid usages.
 
-Or write an inline anonymous hook (and skip passing hook args).
+Now all components that use the useStore hook Will be sharing the same state. When it updates they will all rerender. 
+```js
+const ComponentA = () => {
+  const [state, setState] = useStore()
+}
+const ComponentB = () => {
+  const [state, setState] = useStore()  
+}
+```
+
+### Perform Logic and Compose Other Hooks
+
+Use as many `useState` as you need.
 
 ```js
-const useStore = create(() => {
-  return useStore('Hello')
-})
-
 const useStore = create(() => {
   const [foo, setFoo] = useState()
   const [bar, setBar] = useState()
@@ -86,11 +89,37 @@ const useStore = create(() => {
 })
 ```
 
+Use other custom hooks together.
+
+```js
+const useStore = create(() => {
+  const name = useUserName()
+  const locale = useLocale()
+  return { name, locale }
+})
+```
+
+Use 3rd party hooks.
+
+```js
+import useImmer from 'use-immer'
+import usePromise from 'react-use-promise'
+const useStore = create(() => {
+  const [person, updatePerson] = useImmer({
+    id: 1,
+    name: "Michael",
+    age: 33
+  });
+  const [products, error] = usePromise(fetch('/api/cart' + person.id))
+  return {products, person, updatePerson}
+})
+```
+
+> Note: Contextual hooks will not work, see the section at the bottom.
+
 ### The returned zustand hook
 
-The hook you are returned is a small wrapper around a regular zustand hook object. Zusteller is built on zustand!
-The difference is instead of creating a store with zustand's `(set, get) => ({})` creator function, you've essentially
-*lifted* a regular hook to become global. You can now share that lifted hook's state anywhere.
+The hook you are returned is a small wrapper around a regular [zustand](https://github.com/react-spring/zustand) hook object.
 
 Use it in multiple React components. The state will be shared.
 
@@ -150,9 +179,48 @@ const Component = () => {
 }
 ```
 
+### Passing Parameters to The Store's Underlying Hook
 
+This is called atomFamily in Recoil and Jotai. It's the ability to create many forked instances of the store based on
+parameters passed in during usage.
 
+So if our hook took a parameter, for example an id.
+```js
+const useUserStore = create(id => {
+  return useUser(id)
+})
+```
 
+You can provide the parameters by passing them in an array as the first argument to the store.
+```js
+const ComponentA = () => {
+  const user = useUserStore([42])
+}
+```
+
+Each unique combination of parameters gets its own store instance. If two or more components pass the same parameters,
+they will share a store.
+```js
+const ComponentA = () => {
+  const user = useUserStore([42])
+}
+const ComponentB = () => {
+  const user = useUserStore([96])
+}
+const ComponentC = () => {
+  const user = useUserStore() // undefined is it's own unique parameter
+}
+const ComponentD = () => {
+  const user = useUserStore([42]) // D will share a store with A
+}
+```
+
+The arguments you pass to the hook are safely memo-ized (just like react-query does). For example this is fine.
+```js
+const ComponentA = () => {
+  const user = useUserStore([42, { foo: true, bar: [1, 2, 3] }, 'hello', null])
+}
+```
 
 ## Examples
 
