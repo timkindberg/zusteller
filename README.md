@@ -60,9 +60,7 @@ Or pass an inline-anonymous hook.
 const useStore = create(() => useState(42))
 ```
 
-All three of the above are valid usages.
-
-Now all components that use the useStore hook Will be sharing the same state. When it updates they will all rerender. 
+Now components can share the same state. When state updates they will all re-render. 
 ```js
 const ComponentA = () => {
   const [state, setState] = useStore()
