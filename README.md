@@ -47,19 +47,15 @@ First import `create` from `zusteller`.
 import create from 'zusteller'
 ```
 
-Pass `create` a hook. The simplest way to use it is to pass `useState`.
+Pass `create` a hook. 
 
-```js
-const useStore = create(useState)
-```
-
-But pass your own hooks as well. Here we initialize some state.
 ```js
 const useMyState = () => useState(42)
 const useStore = create(useMyState)
 ```
 
-Or pass an inline-anonymous hook
+Or pass an inline-anonymous hook.
+
 ```js
 const useStore = create(() => useState(42))
 ```
