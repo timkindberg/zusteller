@@ -11,7 +11,7 @@ const debug = (...args) => (debugEnabled ? console.log(...args) : void 0);
 const tick = async (ms = 0) => await new Promise(res => setTimeout(res, ms));
 
 describe('render count sanity checks', () => {
-  it('renders a baseline # of times', () => {
+  it('renders a regular hook a baseline # of times', () => {
     const hookRender = jest.fn();
     const cmpRender = jest.fn();
 
@@ -36,16 +36,27 @@ describe('create', () => {
     const cmpRender = jest.fn();
     const useTitle = create(() => useState('Welcome'));
 
-    const Title = () => {
+    const Title = ({ id }) => {
       cmpRender();
-      const title = useTitle(s => s[0]);
-      return <h1>{title}</h1>;
+      const [title] = useTitle();
+      console.log(title);
+      return (
+        <h1>
+          {title} {id}
+        </h1>
+      );
     };
 
-    render(<Title />);
+    render(
+      <>
+        <Title id="1" />
+        <Title id="2" />
+      </>
+    );
 
-    expect(screen.getByRole('heading').textContent).toEqual('Welcome');
-    expect(cmpRender.mock.calls).toHaveLength(1);
+    expect(screen.getAllByRole('heading')[0].textContent).toEqual('Welcome 1');
+    expect(screen.getAllByRole('heading')[1].textContent).toEqual('Welcome 2');
+    expect(cmpRender.mock.calls).toHaveLength(2);
   });
 
   it('Double useState', async () => {
@@ -127,11 +138,11 @@ describe('create', () => {
     expect(screen.getByRole('heading').textContent).toEqual('Welcome');
 
     debug('----- type');
-    await userEvent.type(screen.getByRole('textbox'), ' to Hell!');
+    await userEvent.paste(screen.getByRole('textbox'), ' to Hell!');
     await tick();
-    expect(hookRender.mock.calls).toHaveLength(10); // nine letters typed
-    expect(titleRender.mock.calls).toHaveLength(10);
-    expect(titleInputRender.mock.calls).toHaveLength(10);
+    expect(hookRender.mock.calls).toHaveLength(2); // nine letters typed
+    expect(titleRender.mock.calls).toHaveLength(2);
+    expect(titleInputRender.mock.calls).toHaveLength(2);
     expect(titleButtonRender.mock.calls).toHaveLength(1);
     expect(appRender.mock.calls).toHaveLength(1);
 
@@ -142,16 +153,66 @@ describe('create', () => {
       setTitle('jk it is heaven');
     });
 
-    expect(hookRender.mock.calls).toHaveLength(11);
-    expect(titleRender.mock.calls).toHaveLength(11);
-    expect(titleInputRender.mock.calls).toHaveLength(11);
+    expect(hookRender.mock.calls).toHaveLength(3);
+    expect(titleRender.mock.calls).toHaveLength(3);
+    expect(titleInputRender.mock.calls).toHaveLength(3);
     expect(titleButtonRender.mock.calls).toHaveLength(1);
     expect(appRender.mock.calls).toHaveLength(1);
 
     expect(screen.getByRole('heading').textContent).toEqual('jk it is heaven');
   });
 
-  describe('atomFamily (WIP)', () => {
+  test('allows unmounting of the master component (not really a "master" anymore)', async () => {
+    const useTitle = create(() => {
+      return useState('Welcome');
+    });
+
+    const Title = () => {
+      debug('Title Render');
+      const title = useTitle(s => s[0]);
+      debug('Title', title);
+      return <h1>{title}</h1>;
+    };
+
+    const TitleInput = () => {
+      debug('TitleInput Render');
+      const [title, setTitle] = useTitle();
+      debug('TitleInput', title);
+      return <input value={title} onChange={e => setTitle(e.target.value)} />;
+    };
+
+    const TestBed = () => {
+      const [removeTitle, setRemoveTitle] = useState(false);
+      return (
+        <>
+          {!removeTitle && <Title />}
+          <Title />
+          <TitleInput />
+          <button onClick={() => setRemoveTitle(true)}>Remove Title</button>
+        </>
+      );
+    };
+
+    render(<TestBed />);
+
+    let headings = screen.getAllByRole('heading');
+    expect(headings).toHaveLength(2);
+    expect(headings[0].textContent).toEqual('Welcome');
+    expect(headings[1].textContent).toEqual('Welcome');
+
+    debug('----- unmount');
+    userEvent.click(screen.getByRole('button'));
+
+    debug('----- type');
+    await userEvent.type(screen.getByRole('textbox'), ' to Hell!');
+    await tick();
+
+    headings = screen.getAllByRole('heading');
+    expect(headings).toHaveLength(1);
+    expect(headings[0].textContent).toEqual('Welcome to Hell!');
+  });
+
+  describe('atomFamily', () => {
     it('makes one', async () => {
       const useFoo = create((arg = '') => {
         const [val, setVal] = useState('foo');
@@ -203,12 +264,14 @@ describe('create', () => {
       expect(screen.queryAllByText('foo')).toHaveLength(0);
     });
 
-    it('does things', async () => {
-      const useGreeting = create(() => {
-        return useState('Welcome');
-      });
+    it('renders multiple with different args', async () => {
+      const useGreeting = create(() => useState('Welcome'));
       const useFullGreeting = create(name => {
-        const [greeting] = useGreeting();
+        const state = useGreeting();
+        console.log('STATE', state);
+        // I really hate that I have to set a fallback value here, because state is undefined for a tick :(
+        // This will annoy devs
+        const [greeting] = state || [];
         return `${greeting} ${name}`;
       });
 

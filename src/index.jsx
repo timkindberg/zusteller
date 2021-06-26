@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { render } from 'react-nil';
 import zcreate from 'zustand';
-import shallow from 'zustand/shallow';
 import { serializeHookArgs, useImmediateEffect, usePrevious } from './utils';
 
-const debugEnabled = false;
+const debugEnabled = true;
 const debug = (...args) => (debugEnabled ? console.log(...args) : void 0);
 const SET_STATE_ERR =
   'Zusteller stores do not support setState. You must set state via methods returned from your hook.';
@@ -27,11 +27,6 @@ export default function create(useHook, defaultIsEqual) {
         eqFn(prevValue, nextValue);
     }
     return undefined;
-  }
-  const SLAVE = '__ZUSTELLER_SLAVE__';
-  function getHookIfFirstSubscriber(subscriberCount) {
-    if (subscriberCount === 1) return useHook;
-    return () => SLAVE;
   }
 
   const subscriberCounts = {};
@@ -67,22 +62,14 @@ export default function create(useHook, defaultIsEqual) {
     }, []);
 
     const i = subscriberIndexRef.current;
+    debug(i, '-----------------');
     debug(i, 'hash', hookArgsHash);
     const prevHash = usePrevious(hookArgsHash);
     if (prevHash !== hookArgsHash)
       debug('hash changed', { prev: prevHash, next: hookArgsHash });
-    debug(i, '-----------------');
     debug(i, 'total subscribers', subscriberCounts[hookArgsHash]);
 
-    // Get Hook Result
-    const useHook = getHookIfFirstSubscriber(subscriberIndexRef.current);
-    const result = useHook(...hookArgs);
-    debug(i, 'result', result);
-
     // Set isEqual
-    if (Array.isArray(result) && !defaultIsEqual) {
-      isEqual = shallow;
-    }
     if (isEqual == null && defaultIsEqual) {
       isEqual = defaultIsEqual;
     }
@@ -97,7 +84,7 @@ export default function create(useHook, defaultIsEqual) {
       }
 
       debug(i, 'make new');
-      const useZStore = zcreate(() => ({ value: result }));
+      const useZStore = zcreate(() => ({ value: undefined }));
       const useStoreWrapper = (...args) => useZStore(...args);
       useStoreWrapper.hash = hookArgsHash;
       useStoreWrapper.setState = () => {
@@ -112,38 +99,30 @@ export default function create(useHook, defaultIsEqual) {
         );
       useStoreWrapper.destroy = () => useZStore.destroy();
       storeFamily[hookArgsHash] = useStoreWrapper;
+
+      const node = document.createElement('div');
+      console.log(i, 'render');
+      render(
+        <StoreComponent
+          useHook={useHook}
+          hookArgs={hookArgs}
+          useZStore={useZStore}
+        />,
+        node
+      );
+
+      // TODO unmountComponentAtNode and cleanup
+
       return useZStore;
     }, [hookArgsHash]);
 
-    const prevUseZStore = usePrevious(useZStore);
-    const prevResult = usePrevious(result);
-    if (prevUseZStore !== useZStore) debug('store changed');
-    if (prevResult !== result)
-      debug('result changed', { prev: prevResult, next: result });
-
-    let resultChanged = true;
-    if (Array.isArray(result) && shallow(prevResult, result))
-      resultChanged = false;
-
-    useEffect(() => {
-      debug(i, 'zustand update effect', result, resultChanged);
-      if (result === SLAVE || !resultChanged) return;
-      debug(i, 'update zustand store with result', result);
-      useZStore.setState({ value: result });
-    }, [useZStore, result]);
-
-    const instanceSelector = internalSelector(selector, i);
     const storeResult = useZStore(
-      instanceSelector,
+      internalSelector(selector, i),
       internalIsEqual(isEqual, i)
     );
-    const returnVal =
-      result === SLAVE ? storeResult : instanceSelector({ value: result });
     debug(i, 'hookResult', storeResult);
-    debug(i, 'selector result', instanceSelector({ value: result }));
-    debug(i, 'returnVal', returnVal);
 
-    return returnVal;
+    return storeResult;
   }
 
   useStore.family = storeFamily;
@@ -179,4 +158,15 @@ export default function create(useHook, defaultIsEqual) {
   };
   useStore.destroy = (hookArgs = []) => useStore.fromArgs(hookArgs).destroy();
   return useStore;
+}
+
+function StoreComponent({ useHook, hookArgs = [], useZStore }) {
+  const result = useHook(...hookArgs);
+  useZStore.getState().value = result;
+  debug('StoreComponent render', result);
+  useImmediateEffect(() => {
+    debug('StoreComponent effect', result);
+    useZStore.setState({ value: result });
+  }, [useZStore, result]);
+  return null;
 }
