@@ -11,9 +11,9 @@ const SET_STATE_ERR =
 export default function create(useHook, defaultIsEqual) {
   const storeFamily = {};
 
-  function internalSelector(selector, id = 0) {
+  function makeInternalSelector(selector, id = 0) {
     return ({ value }) => {
-      debug('internalSelector', id, value);
+      debug('makeInternalSelector', id, value);
       if (value == null) return value;
       if (typeof selector === 'function') {
         return selector(value);
@@ -21,7 +21,7 @@ export default function create(useHook, defaultIsEqual) {
       return value;
     };
   }
-  function internalIsEqual(eqFn, i) {
+  function makeInternalIsEqual(eqFn, i) {
     if (typeof eqFn === 'function') {
       return ({ value: prevValue }, { value: nextValue }) =>
         eqFn(prevValue, nextValue);
@@ -31,6 +31,44 @@ export default function create(useHook, defaultIsEqual) {
 
   const subscriberCounts = {};
 
+  // Make the default no-args store
+  const defaultStore = makeNewZustandStore('[]', [], 0);
+  // const defaultStore = storeFamily['[]'];
+
+  function makeNewZustandStore(hookArgsHash, hookArgs, id) {
+    const useZStore = zcreate(() => ({ value: undefined }));
+    const useStoreWrapper = (...args) => useZStore(...args);
+    useStoreWrapper.hash = hookArgsHash;
+    useStoreWrapper.setState = () => {
+      throw new Error(SET_STATE_ERR);
+    };
+    useStoreWrapper.getState = () => {
+      debug('useStoreWrapper.getState', useZStore.getState().value);
+      return useZStore.getState().value;
+    };
+    useStoreWrapper.subscribe = (listener, selector, isEqual) =>
+      useZStore.subscribe(
+        listener,
+        makeInternalSelector(selector, id),
+        makeInternalIsEqual(isEqual, id)
+      );
+    useStoreWrapper.destroy = () => useZStore.destroy();
+    storeFamily[hookArgsHash] = useStoreWrapper;
+
+    const node = document.createElement('div');
+    console.log(id, 'render');
+    render(
+      <StoreComponent
+        useHook={useHook}
+        hookArgs={hookArgs}
+        useZStore={useZStore}
+      />,
+      node
+    );
+
+    return useZStore;
+  }
+
   function useStore(...args) {
     let hookArgs = [];
     let selector;
@@ -38,6 +76,10 @@ export default function create(useHook, defaultIsEqual) {
     if (Array.isArray(args[0])) {
       hookArgs = args[0];
       [, selector, isEqual] = args;
+    } else if (args[0] != null && typeof args[0] != 'function') {
+      throw new Error(
+        'Invalid Argument: Only a selector function or args array is supported. Did you mean to wrap your args in an array?'
+      );
     } else {
       [selector, isEqual] = args;
     }
@@ -61,13 +103,13 @@ export default function create(useHook, defaultIsEqual) {
       };
     }, []);
 
-    const i = subscriberIndexRef.current;
-    debug(i, '-----------------');
-    debug(i, 'hash', hookArgsHash);
+    const id = subscriberIndexRef.current;
+    debug(id, '-----------------');
+    debug(id, 'hash', hookArgsHash);
     const prevHash = usePrevious(hookArgsHash);
     if (prevHash !== hookArgsHash)
       debug('hash changed', { prev: prevHash, next: hookArgsHash });
-    debug(i, 'total subscribers', subscriberCounts[hookArgsHash]);
+    debug(id, 'total subscribers', subscriberCounts[hookArgsHash]);
 
     // Set isEqual
     if (isEqual == null && defaultIsEqual) {
@@ -75,52 +117,41 @@ export default function create(useHook, defaultIsEqual) {
     }
 
     // Create or Get Cached Zustand Store Hook
+    const isNewlyMadeRef = useRef(false);
     const useZStore = useMemo(() => {
       debug('enter memo');
       const cachedStore = storeFamily[hookArgsHash];
       if (cachedStore) {
-        debug(i, 'use cached');
+        debug(id, 'use cached');
         return cachedStore;
       }
 
-      debug(i, 'make new');
-      const useZStore = zcreate(() => ({ value: undefined }));
-      const useStoreWrapper = (...args) => useZStore(...args);
-      useStoreWrapper.hash = hookArgsHash;
-      useStoreWrapper.setState = () => {
-        throw new Error(SET_STATE_ERR);
-      };
-      useStoreWrapper.getState = () => useZStore.getState().value;
-      useStoreWrapper.subscribe = (listener, selector, isEqual) =>
-        useZStore.subscribe(
-          listener,
-          internalSelector(selector, i),
-          internalIsEqual(isEqual, i)
-        );
-      useStoreWrapper.destroy = () => useZStore.destroy();
-      storeFamily[hookArgsHash] = useStoreWrapper;
-
-      const node = document.createElement('div');
-      console.log(i, 'render');
-      render(
-        <StoreComponent
-          useHook={useHook}
-          hookArgs={hookArgs}
-          useZStore={useZStore}
-        />,
-        node
-      );
-
-      // TODO unmountComponentAtNode and cleanup
-
-      return useZStore;
+      debug(id, 'make new');
+      isNewlyMadeRef.current = true;
+      return makeNewZustandStore(hookArgsHash, hookArgs, id);
     }, [hookArgsHash]);
 
-    const storeResult = useZStore(
-      internalSelector(selector, i),
-      internalIsEqual(isEqual, i)
-    );
-    debug(i, 'hookResult', storeResult);
+    const internalSelector = makeInternalSelector(selector, id);
+    const internalIsEqual = makeInternalIsEqual(isEqual, id);
+    const storeResult = useZStore(internalSelector, internalIsEqual);
+    debug(id, 'hookResult', storeResult);
+
+    const defaultResult = internalSelector(defaultStore.getState());
+    debug(id, 'defaultResult', defaultResult);
+
+    if (
+      isNewlyMadeRef.current &&
+      storeResult === undefined &&
+      defaultResult !== undefined
+    ) {
+      debug(
+        id,
+        'return defaultResult for newly made hook args store',
+        defaultResult
+      );
+      isNewlyMadeRef.current = false;
+      return defaultResult;
+    }
 
     return storeResult;
   }
@@ -129,6 +160,9 @@ export default function create(useHook, defaultIsEqual) {
   useStore.fromArgs = (hookArgs = []) => {
     const hookArgsHash = serializeHookArgs(hookArgs);
     debug('fromArgs', storeFamily[hookArgsHash]);
+    const cachedStore = storeFamily[hookArgsHash];
+    if (cachedStore) return cachedStore;
+    makeNewZustandStore(hookArgsHash, hookArgs);
     return storeFamily[hookArgsHash];
   };
   useStore.getState = (hookArgs = []) => {
@@ -152,8 +186,8 @@ export default function create(useHook, defaultIsEqual) {
       .getState()
       .subscribe(
         listener,
-        internalSelector(selector),
-        internalIsEqual(isEqual)
+        makeInternalSelector(selector),
+        makeInternalIsEqual(isEqual)
       );
   };
   useStore.destroy = (hookArgs = []) => useStore.fromArgs(hookArgs).destroy();
@@ -161,6 +195,7 @@ export default function create(useHook, defaultIsEqual) {
 }
 
 function StoreComponent({ useHook, hookArgs = [], useZStore }) {
+  debug('StoreComponent hookArgs', hookArgs);
   const result = useHook(...hookArgs);
   useZStore.getState().value = result;
   debug('StoreComponent render', result);

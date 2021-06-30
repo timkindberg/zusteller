@@ -7,7 +7,6 @@ import create from '../src/index';
 
 const debugEnabled = false;
 const debug = (...args) => (debugEnabled ? console.log(...args) : void 0);
-
 const tick = async (ms = 0) => await new Promise(res => setTimeout(res, ms));
 
 describe('render count sanity checks', () => {
@@ -219,18 +218,20 @@ describe('create', () => {
         debug('useFoo', { val, arg });
         return [val + arg, setVal];
       });
-      expect(useFoo.family).toEqual({});
+      expect(useFoo.family).toEqual({
+        '[]': expect.any(Function),
+      });
 
       const Foo1Cmp = () => {
         debug('foo1!');
-        const [foo] = useFoo();
+        const [foo] = useFoo(['hello']);
         debug('foo1 hook result', foo);
         return <div>{foo}</div>;
       };
 
       const Foo2Cmp = () => {
         debug('foo2!');
-        const [foo] = useFoo();
+        const [foo] = useFoo(['hello']);
         debug('foo2 hook result', foo);
         return <div>{foo}</div>;
       };
@@ -247,21 +248,20 @@ describe('create', () => {
       debug('!!! Render Test');
       render(<App />);
 
-      expect(screen.getAllByText('foo')).toHaveLength(2);
+      expect(screen.getAllByText('foohello')).toHaveLength(2);
       expect(useFoo.family).toEqual({
         '[]': expect.any(Function),
+        '["hello"]': expect.any(Function),
       });
 
       debug('!!! External setVal');
       act(() => {
-        const [, setVal] = useFoo.getState();
+        const [, setVal] = useFoo.getState(['hello']);
         setVal('bar');
       });
 
-      await new Promise(res => setTimeout(res, 1000));
-
-      expect(await screen.findAllByText('bar')).toHaveLength(2);
-      expect(screen.queryAllByText('foo')).toHaveLength(0);
+      expect(await screen.findAllByText('barhello')).toHaveLength(2);
+      expect(screen.queryAllByText('foohello')).toHaveLength(0);
     });
 
     it('renders multiple with different args', async () => {
@@ -271,7 +271,7 @@ describe('create', () => {
         console.log('STATE', state);
         // I really hate that I have to set a fallback value here, because state is undefined for a tick :(
         // This will annoy devs
-        const [greeting] = state || [];
+        const [greeting] = state;
         return `${greeting} ${name}`;
       });
 
@@ -322,6 +322,122 @@ describe('create', () => {
       headings = screen.getAllByRole('heading');
       expect(headings[0].textContent).toEqual('jk it is heaven Tim');
       expect(headings[1].textContent).toEqual('jk it is heaven Bob');
+    });
+
+    it('renders multiple with different args nested', async () => {
+      const useGreeting = create((divider = ' ') => {
+        return useState('Welcome' + divider);
+      });
+      const useFullGreeting = create(name => {
+        const [greeting] = useGreeting([' - ']);
+        return `${greeting}${name}`;
+      });
+
+      const GreetingTim = () => {
+        debug('GreetingTim Render');
+        const greeting = useFullGreeting(['Tim']);
+        return <h1>{greeting}</h1>;
+      };
+
+      const GreetingBob = () => {
+        debug('GreetingBob Render');
+        const greeting = useFullGreeting(['Bob']);
+        return <h1>{greeting}</h1>;
+      };
+
+      const GreetingInput = () => {
+        const [greeting, setGreeting] = useGreeting([' - ']);
+        return (
+          <input value={greeting} onChange={e => setGreeting(e.target.value)} />
+        );
+      };
+
+      const TestBed = () => (
+        <>
+          <GreetingTim />
+          <GreetingBob />
+          <GreetingInput />
+        </>
+      );
+
+      render(<TestBed />);
+
+      let headings = screen.getAllByRole('heading');
+      expect(headings[0].textContent).toEqual('Welcome - Tim');
+      expect(headings[1].textContent).toEqual('Welcome - Bob');
+
+      await userEvent.type(screen.getByRole('textbox'), 'to Hell! ');
+
+      headings = screen.getAllByRole('heading');
+      expect(headings[0].textContent).toEqual('Welcome - to Hell! Tim');
+      expect(headings[1].textContent).toEqual('Welcome - to Hell! Bob');
+
+      act(() => {
+        const [, setTitle] = useGreeting.getState([' - ']);
+        setTitle('jk it is heaven ');
+      });
+
+      headings = screen.getAllByRole('heading');
+      expect(headings[0].textContent).toEqual('jk it is heaven Tim');
+      expect(headings[1].textContent).toEqual('jk it is heaven Bob');
+    });
+
+    it('changing hook args', async () => {
+      const useUser = create((id = 'unknown') => {
+        return useState('User ' + id)[0];
+      });
+
+      const UserSelector = () => {
+        const [userId, setUserId] = useState(1);
+        const user = useUser([userId]);
+        return (
+          <>
+            <div>{user}</div>
+            <input
+              value={userId}
+              onChange={e => setUserId(parseInt(e.target.value, 10))}
+            />
+          </>
+        );
+      };
+
+      const TestBed = () => (
+        <>
+          <UserSelector />
+        </>
+      );
+
+      expect(useUser.family).toEqual({
+        '[]': expect.any(Function),
+      });
+
+      render(<TestBed />);
+
+      expect(useUser.family).toEqual({
+        '[1]': expect.any(Function),
+        '[]': expect.any(Function),
+      });
+
+      screen.getByText('User 1');
+      await userEvent.type(screen.getByRole('textbox'), '{selectall}2');
+      screen.getByText('User 2');
+
+      expect(useUser.family).toEqual({
+        '[1]': expect.any(Function),
+        '[2]': expect.any(Function),
+        '[]': expect.any(Function),
+      });
+    });
+
+    it('creates family outside react', () => {
+      const useUser = create((id = 'unknown') => {
+        return useState('User ' + id)[0];
+      });
+      expect(useUser.getState([3])).toEqual('User 3');
+      expect(useUser.family).toEqual({
+        '[3]': expect.any(Function),
+        '[]': expect.any(Function),
+      });
     });
   });
 
