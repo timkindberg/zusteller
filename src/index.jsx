@@ -55,7 +55,6 @@ export default function create(useHook, defaultIsEqual) {
     useStoreWrapper.destroy = () => useZStore.destroy();
     storeFamily[hookArgsHash] = useStoreWrapper;
 
-    const node = document.createElement('div');
     console.log(id, 'render');
     render(
       <StoreComponent
@@ -63,7 +62,7 @@ export default function create(useHook, defaultIsEqual) {
         hookArgs={hookArgs}
         useZStore={useZStore}
       />,
-      node
+      {}
     );
 
     return useZStore;
