@@ -13,6 +13,14 @@ We need more validation that this approach is performant and doesn't introduce a
 
 At the very minimum it serves as a proposal for how canonical React global state might be handled. 
 
+[Update 08/28/21]
+
+This is a fun experiment but I'm not super comfortable with the overall technical direction; it requires a bit of a hack to make it work.
+
+I love the API though, that was always the driving force. I stubbornly acheived it, but to what end?
+
+At my work, we chose react-tracked to get a very similar API. It gives me (mostly) what I wanted without any implementation hacks. It uses canonical React Context which will age better and always work well as new React versions come out.
+
 ## Motivation:
 
 **It is rare that I need global state. Really rare.** You can fill 99% of your needs with regular React Hooks and a fetch caching library
