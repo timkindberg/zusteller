@@ -4,7 +4,7 @@ Your global state savior. "Just hooks" + [zustand](https://github.com/react-spri
 
 ## Disclaimer 
 
-Zusteller is brand new, experimental, and under development.
+Zusteller is ~~brand new,~~ experimental ~~, and under development~~.
 
 To enable the use of hooks within zustand **we render a React element into an HTMLElement in memory and it runs the hook.** 
 When the hook result changes, we update the zustand store. 
